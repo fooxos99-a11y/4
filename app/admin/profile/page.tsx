@@ -239,15 +239,6 @@ export default function AdminProfilePage() {
               </div>
               <div className="flex-1">
                 <div className="mb-2 flex items-center justify-start gap-3">
-                  {!isEditing && (
-                    <Button
-                      onClick={() => setIsEditing(true)}
-                      className="h-10 rounded-2xl border border-white/30 bg-white/12 px-4 text-sm font-bold text-white backdrop-blur-sm hover:bg-white/18"
-                    >
-                      <Edit2 className="w-4 h-4 ml-2" />
-                      تعديل
-                    </Button>
-                  )}
                   <h1 className="text-4xl font-bold">{adminData.name}</h1>
                 </div>
                 <p className="text-xl opacity-90">حساب إداري</p>
