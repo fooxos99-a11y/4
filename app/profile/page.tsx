@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { User, Trophy, Award, Calendar, Star, BarChart3, Medal, Gem, Flame, Zap, Crown, Heart, BookMarked, CheckCircle2, Clock, BookOpen, Library, Check, PlayCircle, Lock } from "lucide-react"
-import { SURAHS, formatQuranRange, getActivePlanDayNumber, getAdjustedPlanPreviewRange, getDisplayCompletedDays, getJuzCoverageFromRange, getJuzCoverageFromRanges, getJuzProgressDetailsFromRange, getJuzProgressDetailsFromRanges, getPlanMemorizedRange, getPlanSessionContent, getPlanSupportSessionContent, getStoredMemorizedRange, getStoredMemorizedRanges, hasScatteredCompletedJuzs, resolvePlanTotalDays, resolvePlanTotalPages } from "@/lib/quran-data"
+import { SURAHS, formatQuranRange, getActivePlanDayNumber, getAdjustedPlanPreviewRange, getDisplayCompletedDays, getJuzCoverageFromRanges, getJuzProgressDetailsFromRanges, getPlanMemorizedRanges, getPlanSessionContent, getPlanSupportSessionContent, getStoredMemorizedRanges, hasScatteredCompletedJuzs, resolvePlanTotalDays, resolvePlanTotalPages } from "@/lib/quran-data"
 import { Button } from "@/components/ui/button"
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog"
 import { ThemeSwitcher } from "@/components/theme-switcher"
@@ -443,28 +443,17 @@ function ProfilePage() {
       }
     : null
 
-  const memorizedRange = normalizedPlanData
-    ? getPlanMemorizedRange(normalizedPlanData, planCompletedDays, planHafizExtraPages)
-    : hasScatteredCompletedJuzs(studentData?.completed_juzs)
-      ? null
-      : getStoredMemorizedRange(studentData)
-
   const storedMemorizedRanges = getStoredMemorizedRanges(studentData)
+  const memorizedRanges = normalizedPlanData
+    ? getPlanMemorizedRanges(normalizedPlanData, planCompletedDays, planHafizExtraPages)
+    : storedMemorizedRanges
 
-  const { completedJuzs, currentJuzs } = normalizedPlanData
-    ? getJuzCoverageFromRange(memorizedRange)
-    : getJuzCoverageFromRanges(storedMemorizedRanges)
-  const juzProgressDetails = normalizedPlanData
-    ? getJuzProgressDetailsFromRange(
-        memorizedRange,
-        studentData?.completed_juzs,
-        studentData?.current_juzs,
-      )
-    : getJuzProgressDetailsFromRanges(
-        storedMemorizedRanges,
-        studentData?.completed_juzs,
-        studentData?.current_juzs,
-      )
+  const { completedJuzs, currentJuzs } = getJuzCoverageFromRanges(memorizedRanges)
+  const juzProgressDetails = getJuzProgressDetailsFromRanges(
+    memorizedRanges,
+    studentData?.completed_juzs,
+    studentData?.current_juzs,
+  )
 
   return (
     <>
