@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { User, Trophy, Award, Calendar, Star, BarChart3, Medal, Gem, Flame, Zap, Crown, Heart, BookMarked, CheckCircle2, Clock, BookOpen, Library, Check, PlayCircle, Lock } from "lucide-react"
-import { SURAHS, formatQuranRange, getActivePlanDayNumber, getAdjustedPlanPreviewRange, getDisplayCompletedDays, getJuzCoverageFromRanges, getJuzProgressDetailsFromRanges, getPlanMemorizedRanges, getPlanSessionContent, getPlanSupportSessionContent, getStoredMemorizedRanges, hasScatteredCompletedJuzs, resolvePlanTotalDays, resolvePlanTotalPages } from "@/lib/quran-data"
+import { SURAHS, formatQuranRange, getAdjustedPlanPreviewRange, getJuzCoverageFromRanges, getJuzProgressDetailsFromRanges, getPlanMemorizedRanges, getPlanSessionContent, getPlanSupportSessionContent, getStoredMemorizedRanges, hasScatteredCompletedJuzs, resolvePlanTotalDays, resolvePlanTotalPages } from "@/lib/quran-data"
 import { Button } from "@/components/ui/button"
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog"
 import { ThemeSwitcher } from "@/components/theme-switcher"
@@ -133,7 +133,7 @@ function ProfilePage() {
   const [planReviewCompletedDays, setPlanReviewCompletedDays] = useState(0)
   const [planHafizExtraPages, setPlanHafizExtraPages] = useState(0)
   const [planProgress, setPlanProgress] = useState(0)
-  const [planAttendance, setPlanAttendance] = useState<any[]>([])
+  const [planCompletedSessionIndices, setPlanCompletedSessionIndices] = useState<number[]>([])
   const [isLoadingPlan, setIsLoadingPlan] = useState(false)
   const [achievements, setAchievements] = useState<StudentAchievement[]>([])
   const confirmDialog = useConfirmDialog()
@@ -260,7 +260,7 @@ function ProfilePage() {
       setPlanReviewCompletedDays(data.reviewCompletedDays ?? 0)
       setPlanHafizExtraPages(data.hafizExtraPages ?? 0)
       setPlanProgress(data.progressPercent ?? 0)
-      setPlanAttendance(data.completedRecords ?? [])
+      setPlanCompletedSessionIndices(Array.isArray(data.completedSessionIndices) ? data.completedSessionIndices : [])
 
       // منح إنجاز تلقائي عند اكتمال الخطة 100%
       if ((data.progressPercent ?? 0) >= 100 && data.plan) {
@@ -756,12 +756,10 @@ function ProfilePage() {
                       label = `${daily} أوجه`
                     }
 
-                    const completed = planAttendance[i] || null
-                    return { dayNum, label, sessionContent, completed }
+                    return { dayNum, label, sessionContent }
                   })
-
-                                    const displayCompletedDays = getDisplayCompletedDays(planCompletedDays, planData.start_date);
-                                    const activeDayNum = getActivePlanDayNumber(totalDays, planCompletedDays, planData.start_date, planData.created_at);
+                  const completedSessionSet = new Set(planCompletedSessionIndices)
+                  const nextPendingDayNum = allDays.find(({ dayNum }) => !completedSessionSet.has(dayNum))?.dayNum ?? null
                   
                   const { muraajaa: muraajaaContent, rabt: rabtContent } = normalizedPlanData
                     ? getPlanSupportSessionContent(normalizedPlanData, planCompletedDays, planReviewCompletedDays, planHafizExtraPages)
@@ -824,8 +822,9 @@ function ProfilePage() {
                           {/* خط التسلسل */}
                           <div className="absolute right-[28px] top-0 bottom-0 w-0.5 bg-[#3453a7]/15" />
                           <div className="space-y-0">
-                            {allDays.map(({ dayNum, label, sessionContent, completed }) => {
-                              const isNext = !completed && dayNum === displayCompletedDays + 1
+                            {allDays.map(({ dayNum, label, sessionContent }) => {
+                              const completed = completedSessionSet.has(dayNum)
+                              const isNext = nextPendingDayNum !== null && dayNum === nextPendingDayNum
                               return (
                                 <div
                                   key={dayNum}

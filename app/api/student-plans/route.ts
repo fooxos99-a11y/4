@@ -32,6 +32,7 @@ export const revalidate = 0
 type StudentPlanSummaryPayload = {
   plan: any | null
   completedDays: number
+  completedSessionIndices?: number[]
   reviewCompletedDays: number
   progressPercent: number
   hafizExtraPages: number
@@ -467,7 +468,7 @@ function buildStudentPlanSummary(
       quranMemorizedPages: storedQuranMemorization.memorizedPages,
       quranProgressPercent: storedQuranMemorization.progressPercent,
       quranLevel: storedQuranMemorization.level,
-      ...(includeAttendanceDetails ? { attendanceRecords: [], completedRecords: [] } : {}),
+      ...(includeAttendanceDetails ? { attendanceRecords: [], completedRecords: [], completedSessionIndices: [] } : {}),
     }
   }
 
@@ -498,6 +499,7 @@ function buildStudentPlanSummary(
   const sessionProgress = getScheduledSessionProgress(passingRecords, scheduledDates)
   const completedDays = sessionProgress.completedDays
   const completedRecords = sessionProgress.completedRecords
+  const completedSessionIndices = sessionProgress.completedSessionIndices
   const reviewCompletedDays = filteredAttendanceRecords.filter(hasCompletedReview).length
   const hafizExtraPages = Math.min(
     Number(plan.total_pages) || 0,
@@ -521,7 +523,7 @@ function buildStudentPlanSummary(
     quranProgressPercent: storedQuranMemorization.progressPercent,
     quranLevel: storedQuranMemorization.level,
     ...(includeAttendanceDetails
-      ? { attendanceRecords: filteredAttendanceRecords, completedRecords }
+      ? { attendanceRecords: filteredAttendanceRecords, completedRecords, completedSessionIndices }
       : {}),
   }
 }
