@@ -12,7 +12,7 @@ export type WhatsAppStatusSummary = {
 }
 
 function isLinkedStatus(status: WhatsAppStatusSummary | null) {
-  return Boolean(status?.ready && status?.authenticated && status?.status === "connected")
+  return Boolean(status?.workerOnline && status?.ready && status?.authenticated && status?.status === "connected")
 }
 
 export function useWhatsAppStatus(options?: { pollIntervalMs?: number; enabled?: boolean }) {

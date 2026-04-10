@@ -91,5 +91,5 @@ export default function TeacherWeeklyReportsPage() {
     );
   }
 
-  return <CircleWeeklyReports circleName={teacherCircle} backHref="/teacher/dashboard" backLabel="العودة للوحة المعلم" />;
+  return <CircleWeeklyReports circleName={teacherCircle} backHref="/teacher/dashboard" backLabel="العودة للوحة المعلم" showBackButton={false} />;
 }

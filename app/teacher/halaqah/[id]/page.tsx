@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowRight, RotateCcw, MessageSquare, Plus } from "lucide-react"
+import { ArrowRight, RotateCcw, MessageSquare, Plus, CircleAlert } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { useAlertDialog } from "@/hooks/use-confirm-dialog"
@@ -301,6 +301,7 @@ export default function HalaqahManagement() {
 		const [missedDays, setMissedDays] = useState<MissedDayRecord[]>([])
         const [isCompLoading, setIsCompLoading] = useState(false)
 		const [showReadingSegments, setShowReadingSegments] = useState(false)
+		const [studentsWithoutPlanCount, setStudentsWithoutPlanCount] = useState(0)
 		const studentsRef = useRef<StudentAttendance[]>([])
 		const readingSegmentsStorageKey = teacherData?.id
 			? `halaqah-show-reading-segments-${teacherData.id}`
@@ -450,7 +451,7 @@ export default function HalaqahManagement() {
 
 				const localStudentsMap = new Map(studentsRef.current.map((student) => [student.id, student] as const))
 
-				const mappedStudents: StudentAttendance[] = data.students.map((student: any) => {
+				const allMappedStudents: StudentAttendance[] = data.students.map((student: any) => {
 					const planData = planMap.get(student.id)
 					const planReadingDetails = getPlanReadingDetails(planData?.plan ?? null, planData?.completedDays ?? 0, planData?.hafizExtraPages ?? 0)
 					const localStudent = localStudentsMap.get(student.id)
@@ -470,11 +471,14 @@ export default function HalaqahManagement() {
 						savedToday: false,
 					}
 				})
+				setStudentsWithoutPlanCount(allMappedStudents.filter((student) => !student.hasPlan).length)
+				const mappedStudents = allMappedStudents.filter((student) => student.hasPlan)
 				await loadSavedStudentsForToday(halaqah, mappedStudents)
 			}
 			setIsLoading(false)
 		} catch (error) {
 			console.error("Error fetching students:", error)
+			setStudentsWithoutPlanCount(0)
 			setIsLoading(false)
 		}
 	}
@@ -919,7 +923,18 @@ export default function HalaqahManagement() {
 				<div className="container mx-auto max-w-7xl">
 					<div className="mb-8 overflow-x-auto pb-2">
 						<div className="flex w-full flex-col items-start gap-2 sm:gap-2.5 md:min-w-max md:flex-row-reverse md:flex-nowrap md:items-center md:justify-end">
-							<div className="flex w-fit self-start md:w-auto">
+							<div className="flex w-fit items-center gap-2 self-start md:w-auto">
+								{studentsWithoutPlanCount > 0 && (
+									<Button
+										variant="outline"
+										type="button"
+										onClick={() => void showAlert("يجب إضافة الخطة للطالب ليظهر في التقييم اليومي.", "معلومة")}
+										className="h-11 w-11 shrink-0 rounded-full border-[#3453a7]/70 bg-white/90 p-0 text-[#3453a7] shadow-sm transition-all hover:bg-[#3453a7]/10 sm:h-10 sm:w-10"
+										title="لماذا لا يظهر بعض الطلاب؟"
+									>
+										<CircleAlert className="h-4 w-4" />
+									</Button>
+								)}
 								<label className="plan-history-checkbox h-11 w-fit shrink-0 rounded-full border border-[#3453a7]/70 bg-white/90 px-4 text-sm font-semibold text-[#1a2332] shadow-sm transition-all hover:bg-[#faf7f0] sm:h-10 sm:px-4 sm:text-sm">
 									<input
 										type="checkbox"
@@ -968,8 +983,8 @@ export default function HalaqahManagement() {
 					</div>
 					{students.length === 0 ? (
 						<div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
-							<p className="text-2xl font-bold text-[#1a2332]">لا يوجد طلاب في هذه الحلقة</p>
-							<p className="text-lg text-[#1a2332]/70">يمكنك إضافة طلاب من لوحة التحكم</p>
+							<p className="text-2xl font-bold text-[#1a2332]">{studentsWithoutPlanCount > 0 ? "لا يوجد طلاب لديهم خطة في هذه الحلقة" : "لا يوجد طلاب في هذه الحلقة"}</p>
+							<p className="text-lg text-[#1a2332]/70">{studentsWithoutPlanCount > 0 ? "أضف خطة للطالب ليظهر في التقييم اليومي" : "يمكنك إضافة طلاب من لوحة التحكم"}</p>
 						</div>
 					) : (
 						<>
@@ -977,16 +992,12 @@ export default function HalaqahManagement() {
 							<div className="space-y-4">
 								{students.map((student) => (
 										(() => {
-											const isNoPlanLocked = !student.hasPlan && !student.savedToday
-
 											return (
 									<Card
 										key={student.id}
 										className={`border-2 shadow-lg transition-all ${
 											student.savedToday
 												? "border-[#3453a7]/25 bg-[#f5f8ff] opacity-80 pointer-events-none select-none"
-												: isNoPlanLocked
-													? "border-slate-200 bg-slate-50 opacity-80 pointer-events-none select-none"
 												: "border-[#3453a7]/20"
 										}`}
 									>
@@ -1081,14 +1092,7 @@ export default function HalaqahManagement() {
 													</div>
 												</div>
 
-												{/* Evaluation Options */}
-												{isNoPlanLocked && (
-													<div className="lg:col-span-4 flex items-center justify-center">
-														<div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-5 py-8 text-center opacity-90">
-															<p className="text-sm font-semibold text-[#526071]">لا توجد لديه خطة</p>
-														</div>
-													</div>
-												)}
+														{/* Evaluation Options */}
 												{isEvaluatedAttendance(student.attendance) && !student.savedToday && student.hasPlan && (
 															<div className="lg:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-6">
 														<EvaluationOption
@@ -1224,7 +1228,7 @@ export default function HalaqahManagement() {
 					<DialogTitle className="text-center text-xl font-bold text-[#1a2332]">زيادة الحفظ</DialogTitle>
 					<div className="space-y-4 pt-4">
 						<p className="rounded-xl border border-[#3453a7]/15 bg-[#f5f8ff] px-3 py-2 text-xs font-medium leading-6 text-[#3453a7]">
-							اختر مقدار الزيادة على حفظ اليوم. هذه الزيادة تُقدّم بداية حفظ الغد وتضيف نقاطًا تلقائيًا.
+							اختر مقدار الزيادة على حفظ اليوم.
 						</p>
 						<div className="grid grid-cols-3 gap-2">
 							{HAFIZ_EXTRA_PAGE_VALUES.map((value) => {
@@ -1249,13 +1253,6 @@ export default function HalaqahManagement() {
 								className="text-sm h-9 rounded-lg border-[#3453a7]/80 text-neutral-600"
 							>
 								إلغاء
-							</Button>
-							<Button
-								variant="outline"
-								onClick={clearHafizExtra}
-								className="text-sm h-9 rounded-lg border-red-200 text-red-600 hover:bg-red-50"
-							>
-								إزالة الزيادة
 							</Button>
 							<Button
 								onClick={saveHafizExtra}

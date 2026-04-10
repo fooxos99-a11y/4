@@ -46,10 +46,13 @@ function finalizeStatus(payload: WorkerStatusPayload, qrExists: boolean) {
   const heartbeatTime = payload.lastHeartbeatAt ? new Date(payload.lastHeartbeatAt).getTime() : 0
   const workerOnline = Boolean(heartbeatTime) && Date.now() - heartbeatTime <= ONLINE_THRESHOLD_MS
   const hasQr = Boolean(payload.qrAvailable && (payload.qrValue || qrExists))
+  const isConnected = Boolean(workerOnline && payload.ready && payload.authenticated && payload.status === "connected")
 
   return {
     ...fallback,
     ...payload,
+    ready: isConnected,
+    authenticated: isConnected,
     qrAvailable: hasQr,
     workerOnline,
     qrImageUrl: hasQr ? `/api/whatsapp/qr?t=${encodeURIComponent(payload.qrUpdatedAt || payload.lastUpdatedAt || Date.now().toString())}` : null,

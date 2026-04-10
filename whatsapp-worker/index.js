@@ -35,6 +35,7 @@ const INCOMING_SYNC_MESSAGE_LIMIT = Number(process.env.WHATSAPP_INCOMING_SYNC_ME
 const QUEUE_POLL_INTERVAL_MS = Number(process.env.WHATSAPP_QUEUE_POLL_INTERVAL_MS || 5000)
 const IS_LINUX = process.platform === "linux"
 const HEARTBEAT_INTERVAL_MS = Number(process.env.WHATSAPP_HEARTBEAT_INTERVAL_MS || 15000)
+const CONNECTION_CHECK_INTERVAL_MS = Number(process.env.WHATSAPP_CONNECTION_CHECK_INTERVAL_MS || 10000)
 
 const PUPPETEER_ARGS = IS_LINUX
   ? [
@@ -579,6 +580,76 @@ function persistWorkerState(partialState = {}) {
   void persistWorkerStateToSupabase()
 }
 
+function isClientConnectedState(clientState) {
+  return String(clientState || "").trim().toUpperCase() === "CONNECTED"
+}
+
+function isClientUnpairedState(clientState) {
+  const normalizedState = String(clientState || "").trim().toUpperCase()
+  return normalizedState === "UNPAIRED" || normalizedState === "UNPAIRED_IDLE"
+}
+
+async function verifyWhatsAppConnection() {
+  if (isResettingSession || typeof whatsappClient.getState !== "function") {
+    return
+  }
+
+  try {
+    const clientState = await whatsappClient.getState()
+    const normalizedState = String(clientState || "unknown").trim().toUpperCase()
+
+    if (isClientConnectedState(normalizedState)) {
+      if (!isWhatsappReady || workerState.status !== "connected" || !workerState.ready || !workerState.authenticated) {
+        isWhatsappReady = true
+        removeQrImage()
+        persistWorkerState({
+          status: "connected",
+          qrAvailable: false,
+          ready: true,
+          authenticated: true,
+          qrValue: null,
+          connectedAt: workerState.connectedAt || new Date().toISOString(),
+          lastError: null,
+        })
+      } else {
+        persistWorkerState({ lastHeartbeatAt: new Date().toISOString() })
+      }
+      return
+    }
+
+    isWhatsappReady = false
+
+    if (isClientUnpairedState(normalizedState)) {
+      persistWorkerState({
+        status: "disconnected",
+        qrAvailable: false,
+        ready: false,
+        authenticated: false,
+        qrValue: null,
+        disconnectedAt: new Date().toISOString(),
+        lastError: `WhatsApp state changed to ${normalizedState}`,
+      })
+
+      if (!isResettingSession) {
+        void resetWhatsAppSession()
+      }
+      return
+    }
+
+    persistWorkerState({
+      status: normalizedState === "OPENING" || normalizedState === "PAIRING" ? "authenticating" : "disconnected",
+      ready: false,
+      authenticated: false,
+      qrAvailable: fs.existsSync(QR_IMAGE_PATH),
+      qrValue: null,
+      disconnectedAt: normalizedState === "OPENING" || normalizedState === "PAIRING" ? workerState.disconnectedAt : new Date().toISOString(),
+      lastError: normalizedState === "OPENING" || normalizedState === "PAIRING" ? null : `WhatsApp state changed to ${normalizedState}`,
+    })
+  } catch (error) {
+    log("Failed to verify live WhatsApp connection state.", error)
+  }
+}
+
 function removeQrImage() {
   try {
     if (fs.existsSync(QR_IMAGE_PATH)) {
@@ -953,6 +1024,10 @@ async function bootstrap() {
   setInterval(() => {
     persistWorkerState({ lastHeartbeatAt: new Date().toISOString() })
   }, HEARTBEAT_INTERVAL_MS).unref()
+
+  setInterval(() => {
+    void verifyWhatsAppConnection()
+  }, CONNECTION_CHECK_INTERVAL_MS).unref()
 
   subscribeToCommands()
 
