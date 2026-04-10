@@ -85,8 +85,7 @@ export default function AdminProfilePage() {
     const fallbackAdminData = createFallbackAdminData()
 
     try {
-      const accountNumber = localStorage.getItem("accountNumber")
-      const response = await fetch("/api/admin-users", { cache: "no-store" })
+      const response = await fetch("/api/admin-users?current=1", { cache: "no-store" })
       const payload = await response.json()
 
       if (!response.ok) {
@@ -104,9 +103,7 @@ export default function AdminProfilePage() {
         return
       }
 
-      const data = Array.isArray(payload.users)
-        ? payload.users.find((user: AdminData) => String(user.account_number) === String(accountNumber)) || null
-        : null
+      const data = payload.user || null
 
       if (data) {
         setAdminData(data)
@@ -144,11 +141,6 @@ export default function AdminProfilePage() {
   const handleSave = async () => {
     if (!adminData) return
 
-    if (usingFallbackData) {
-      await alertDialog("تعديل هذا الحساب المحلي غير متاح حتى يتم إصلاح صلاحيات جدول المستخدمين في Supabase")
-      return
-    }
-
     const normalizedName = editedName.trim()
     if (!normalizedName) {
       await alertDialog("يرجى إدخال الاسم الكامل")
@@ -177,6 +169,15 @@ export default function AdminProfilePage() {
       }
 
       localStorage.setItem("userName", normalizedName)
+      try {
+        const currentUser = localStorage.getItem("currentUser")
+        if (currentUser) {
+          const parsedUser = JSON.parse(currentUser)
+          localStorage.setItem("currentUser", JSON.stringify({ ...parsedUser, name: normalizedName }))
+        }
+      } catch {
+        // ignore local storage sync errors
+      }
       await alertDialog("تم حفظ التعديلات بنجاح")
       setIsEditing(false)
       fetchAdminData()
@@ -251,7 +252,7 @@ export default function AdminProfilePage() {
                   {usingFallbackData ? "عرض محلي مؤقت للحساب الإداري" : "معلومات الحساب الإداري"}
                 </CardDescription>
               </div>
-              {!isEditing && !usingFallbackData && (
+              {!isEditing && (
                 <Button
                   onClick={() => setIsEditing(true)}
                   className="bg-gradient-to-r from-[#3453a7] to-[#4f73d1] hover:from-[#4f73d1] hover:to-[#b88341] text-white font-bold"

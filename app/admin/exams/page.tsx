@@ -1400,7 +1400,7 @@ export default function AdminExamsPage() {
               <div className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] bg-white">
                 <DialogHeader className="border-b border-[#e5edf6] px-6 py-5">
                   <DialogTitle className="flex w-full items-center justify-start gap-2 text-left text-2xl font-black text-[#1a2332]">
-                    <CircleAlert className="h-5 w-5 text-[#b45309]" />
+                    <CircleAlert className="h-5 w-5 text-[#3453a7]" />
                     معالجة الرسوب
                   </DialogTitle>
                   <DialogDescription className="pt-2 text-right text-sm font-semibold leading-7 text-[#64748b]">
@@ -1428,9 +1428,9 @@ export default function AdminExamsPage() {
                       <Input type="date" value={failedExamActionForm.retestDate} onChange={(event) => setFailedExamActionForm((current) => ({ ...current, retestDate: event.target.value }))} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
                     </div>
                   ) : (
-                    <div className="rounded-[22px] border border-[#fde68a] bg-[#fffbeb] px-4 py-4 text-right text-sm font-bold leading-7 text-[#92400e]">
+                    <p className="text-right text-sm font-bold leading-7 text-[#dc2626]">
                       عند اختيار إعادة الحفظ سيتم حذف هذا {portionUnitLabel} من المحفوظ الحالي، ولن يبقى محسوبًا ضمن الخطة الجارية، وسيظهر لاحقًا كجزء يحتاج إلى إتقان عند إضافة خطة جديدة للطالب.
-                    </div>
+                    </p>
                   )}
                 </div>
 
@@ -1439,7 +1439,7 @@ export default function AdminExamsPage() {
                     إغلاق
                   </Button>
                   <Button type="button" onClick={handleConfirmFailedExamAction} disabled={isSaving} className="h-11 rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7]">
-                    {isSaving ? "جاري الحفظ..." : "حفظ القرار"}
+                    {isSaving ? "جاري الحفظ..." : "حفظ فقط"}
                   </Button>
                 </div>
               </div>

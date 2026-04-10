@@ -56,7 +56,30 @@ export async function GET(request: Request) {
       return auth.response
     }
 
+    const { session } = auth
+    const { searchParams } = new URL(request.url)
+    const currentOnly = searchParams.get("current") === "1"
+
     const supabase = createAdminClient()
+
+    if (currentOnly) {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, name, account_number, phone_number, id_number, role")
+        .eq("id", session.id)
+        .maybeSingle()
+
+      if (error) {
+        throw error
+      }
+
+      if (!data || !isStaffRole(String(data.role || ""))) {
+        return NextResponse.json({ error: "لم يتم العثور على بيانات الإداري" }, { status: 404 })
+      }
+
+      return NextResponse.json({ user: data })
+    }
+
     const { data, error } = await supabase
       .from("users")
       .select("id, name, account_number, phone_number, id_number, role")
@@ -143,6 +166,8 @@ export async function PATCH(request: Request) {
       return auth.response
     }
 
+    const { session } = auth
+
     const body = await request.json()
     const id = String(body.id || "").trim()
     if (!id) {
@@ -160,15 +185,18 @@ export async function PATCH(request: Request) {
       throw existingUserError
     }
 
-    if (isProtectedAdminAccount(Number(existingUser?.account_number))) {
+    const isProtectedAccount = isProtectedAdminAccount(Number(existingUser?.account_number))
+    const isSelfUpdate = String(session.id) === String(id)
+
+    if (isProtectedAccount && !isSelfUpdate) {
       return NextResponse.json({ error: "هذا الحساب الإداري ثابت ولا يمكن تعديله" }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
     if (body.name !== undefined) updateData.name = String(body.name || "").trim()
-    if (body.role !== undefined) updateData.role = String(body.role || "").trim()
+    if (!isProtectedAccount && body.role !== undefined) updateData.role = String(body.role || "").trim()
     if (body.id_number !== undefined) updateData.id_number = String(body.id_number || "").trim() || null
-    if (body.account_number !== undefined) {
+    if (!isProtectedAccount && body.account_number !== undefined) {
       const accountNumber = Number.parseInt(String(body.account_number || ""), 10)
       if (Number.isNaN(accountNumber)) {
         return NextResponse.json({ error: "رقم الحساب غير صالح" }, { status: 400 })
@@ -185,6 +213,10 @@ export async function PATCH(request: Request) {
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "لا توجد بيانات لتحديثها" }, { status: 400 })
+    }
+
+    if (isProtectedAccount && !isSelfUpdate) {
+      return NextResponse.json({ error: "هذا الحساب الإداري ثابت ولا يمكن تعديله" }, { status: 403 })
     }
 
     const { data, error } = await supabase
