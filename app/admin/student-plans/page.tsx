@@ -8,6 +8,7 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { SiteLoader } from "@/components/ui/site-loader"
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog"
+import { useAdminAuth } from "@/hooks/use-admin-auth"
 import {
   Dialog,
   DialogContent,
@@ -614,7 +615,7 @@ function getActualMemorizedReviewRanges(student: Student | null, plan: StudentPl
 export default function StudentPlansPage() {
   const router = useRouter();
   const confirmDialog = useConfirmDialog()
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("إدارة الطلاب")
   const [isCirclesLoading, setIsCirclesLoading] = useState(true);
   const [isCircleDataLoading, setIsCircleDataLoading] = useState(false);
   const [circles, setCircles] = useState<Circle[]>([]);
@@ -671,50 +672,16 @@ export default function StudentPlansPage() {
     text: string;
   } | null>(null);
 
-  // التحقق من الصلاحيات
-  useEffect(() => {
-    const check = async () => {
-      const loggedIn = localStorage.getItem("isLoggedIn") === "true";
-      const accountNumber = localStorage.getItem("accountNumber");
-      if (!loggedIn || !accountNumber) {
-        router.push("/login");
-        return;
-      }
-
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("users")
-        .select("role")
-        .eq("account_number", Number(accountNumber))
-        .single();
-      const role = data?.role || "";
-      const adminRoles = [
-        "admin",
-        "مدير",
-        "سكرتير",
-        "مشرف تعليمي",
-        "مشرف تربوي",
-        "مشرف برامج",
-      ];
-      if (!adminRoles.includes(role) && role !== "admin") {
-        router.push("/login");
-        return;
-      }
-      setIsLoading(false);
-    };
-    check();
-  }, [router]);
-
   // جلب الحلقات
   useEffect(() => {
-    if (isLoading) return;
+    if (authLoading || !authVerified) return;
     setIsCirclesLoading(true);
     fetch("/api/circles")
       .then((r) => r.json())
       .then((d) => setCircles(d.circles || []))
       .catch(console.error)
       .finally(() => setIsCirclesLoading(false));
-  }, [isLoading]);
+  }, [authLoading, authVerified]);
 
   // جلب طلاب الحلقة المختارة
   useEffect(() => {
@@ -1557,7 +1524,7 @@ export default function StudentPlansPage() {
     });
   }, [previousRanges]);
 
-  if (isLoading) {
+  if (authLoading || !authVerified) {
     return <SiteLoader fullScreen />;
   }
 
