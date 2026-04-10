@@ -1420,6 +1420,11 @@ export function Header() {
                     setIsMobileMenuOpen(false);
                   }}
                 />
+                <NavItem
+                  icon={Users}
+                  label="التقييم اليومي"
+                  onClick={() => handleNav("/teacher/halaqah/1")}
+                />
                 {userRole === "teacher" && (
                   <NavItem
                     icon={BookMarked}
@@ -1427,11 +1432,6 @@ export function Header() {
                     onClick={() => handleNav("/teacher/student-plans")}
                   />
                 )}
-                <NavItem
-                  icon={Users}
-                  label="التقييم اليومي"
-                  onClick={() => handleNav("/teacher/halaqah/1")}
-                />
                 <NavItem
                   icon={BarChart3}
                   label="تقارير الأسابيع"

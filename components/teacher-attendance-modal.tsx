@@ -232,18 +232,6 @@ export function TeacherAttendanceModal({
             </div>
             <div className="text-3xl font-bold text-[#1a2332] font-mono">{currentTime || "00:00:00"}</div>
           </div>
-
-          {/* Teacher Info */}
-          <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-            <div>
-              <span className="text-xs font-semibold text-[#1a2332]/70">اسم المعلم</span>
-              <p className="text-lg font-bold text-[#1a2332]">{teacherName}</p>
-            </div>
-            <div>
-              <span className="text-xs font-semibold text-[#1a2332]/70">رقم الحساب</span>
-              <p className="text-lg font-bold text-[#1a2332]">{accountNumber}</p>
-            </div>
-          </div>
         </div>
 
         {/* Action Buttons */}
