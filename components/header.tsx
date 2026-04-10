@@ -934,12 +934,7 @@ export function Header() {
   };
 
   const goToHome = () => {
-    if (!isLoggedIn) {
-      handleNav("/");
-      return;
-    }
-
-    goToProfile();
+    handleNav("/");
   };
 
   const deleteNotification = async (id: string) => {

@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+.vscode
+.wwebjs_cache
+whatsapp-worker/.wwebjs_auth
+whatsapp-worker/site-4/.wwebjs_auth
+site4_contabo_key
+site4_contabo_key.pub
+site4-deploy.tar.gz
+deploy/vercel/*.env
+deploy/vps/sites/*/site.env

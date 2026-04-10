@@ -596,9 +596,9 @@ export default function TeacherStudentPlansPage() {
     const init = async () => {
       const loggedIn = localStorage.getItem("isLoggedIn") === "true"
       const role = localStorage.getItem("userRole")
-      const accNum = localStorage.getItem("accountNumber")
+      const accNum = localStorage.getItem("accountNumber") || localStorage.getItem("account_number")
 
-      if (!loggedIn || role !== "teacher" || !accNum) {
+      if (!loggedIn || (role !== "teacher" && role !== "deputy_teacher") || !accNum) {
         router.push("/login")
         return
       }
@@ -614,6 +614,12 @@ export default function TeacherStudentPlansPage() {
 
         const teacherHalaqah = (teacher.halaqah || teacher.circle_name || "").trim()
         setHalaqah(teacherHalaqah)
+
+        if (!teacherHalaqah) {
+          setStudents([])
+          await fetchPlansForStudents([])
+          return
+        }
 
         const studentsRes = await fetch(`/api/students?circle=${encodeURIComponent(teacherHalaqah)}`)
         const studentsData = await studentsRes.json()

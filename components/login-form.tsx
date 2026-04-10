@@ -15,18 +15,6 @@ import {
 } from "@/lib/push-subscription-client"
 
 function getPostLoginRoute(role: string) {
-  if (role === "teacher" || role === "deputy_teacher") {
-    return "/teacher/dashboard"
-  }
-
-  if (role === "student") {
-    return "/profile"
-  }
-
-  if (role === "admin" || role === "supervisor") {
-    return "/admin/profile"
-  }
-
   return "/"
 }
 

@@ -1,5 +1,4 @@
 import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
 
 import { Header } from "@/components/header"
 import { HeroSection } from "@/components/hero-section"
@@ -11,19 +10,7 @@ import { SESSION_COOKIE_NAME, verifySignedSessionToken } from "@/lib/auth/sessio
 
 export default async function Home() {
   const sessionCookie = (await cookies()).get(SESSION_COOKIE_NAME)?.value
-  const session = await verifySignedSessionToken(sessionCookie)
-
-  if (session?.role === "teacher" || session?.role === "deputy_teacher") {
-    redirect("/teacher/dashboard")
-  }
-
-  if (session?.role === "student") {
-    redirect("/profile")
-  }
-
-  if (session?.role === "admin" || session?.role === "supervisor") {
-    redirect("/admin/profile")
-  }
+  await verifySignedSessionToken(sessionCookie)
 
   return (
     <div className="min-h-screen bg-white overflow-x-hidden" dir="rtl">
