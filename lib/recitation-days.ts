@@ -5,7 +5,7 @@ import {
   getJuzBounds,
   getJuzNumbersForPageRange,
   getNormalizedCompletedJuzs,
-  getPlanTraversalRanges,
+  getPlanMemorizedRanges,
   getStoredMemorizedRanges,
   SURAHS,
   getPageForAyah,
@@ -565,7 +565,7 @@ function buildStudentPortions(student: StudentSnapshotSource, planProgress: Stud
 
   const storedRanges = getStoredMemorizedRanges(student)
   const planRanges = planProgress?.plan
-    ? getPlanTraversalRanges(planProgress.plan)
+    ? getPlanMemorizedRanges(planProgress.plan, Number(planProgress.completedDays) || 0)
     : []
 
   for (const range of [...storedRanges, ...planRanges]) {
