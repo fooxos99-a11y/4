@@ -31,12 +31,13 @@ self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url)
   const isSameOrigin = requestUrl.origin === self.location.origin
   const isApiRequest = requestUrl.pathname.startsWith("/api/")
+  const isNextAsset = requestUrl.pathname.startsWith("/_next/")
 
   if (!isSameOrigin) {
     return
   }
 
-  if (isApiRequest || event.request.cache === "no-store") {
+  if (isApiRequest || isNextAsset || event.request.cache === "no-store") {
     event.respondWith(fetch(event.request))
     return
   }

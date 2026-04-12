@@ -387,6 +387,7 @@ export function Header() {
   const [isSidebarStudentStatsLoading, setIsSidebarStudentStatsLoading] = useState(true);
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatusSummary | null>(null);
   const [isWhatsAppQrDialogOpen, setIsWhatsAppQrDialogOpen] = useState(false);
+  const [hasActiveSemester, setHasActiveSemester] = useState<boolean | null>(null);
 
   const canUseDirectNotificationQueries = userRole === "student";
 
@@ -395,6 +396,7 @@ export function Header() {
   const isFullAccess = userAccountNumber === 2 || userRole === "admin" || userRole === "مدير" || userPermissions.includes("all");
 
   const hasPermission = (key: string) => hasPermissionAccess(userPermissions, key, isFullAccess);
+  const canManageSemesters = hasPermission("إنهاء الفصل");
 
   const router = useRouter();
 
@@ -433,6 +435,21 @@ export function Header() {
       const data = await response.json();
       setWhatsAppStatus(data);
     } catch {}
+  };
+
+  const fetchActiveSemesterStatus = async () => {
+    try {
+      const response = await fetch(`/api/semesters?t=${Date.now()}`, { cache: "no-store" });
+      if (!response.ok) {
+        setHasActiveSemester(null);
+        return;
+      }
+
+      const data = await response.json();
+      setHasActiveSemester(Boolean(data.activeSemesterId));
+    } catch {
+      setHasActiveSemester(null);
+    }
   };
 
   const whatsAppNeedsAttention = Boolean(
@@ -674,6 +691,15 @@ export function Header() {
 
     void fetchWhatsAppStatus();
   }, [isMobileMenuOpen, isAdmin, userPermissions.length, userRole]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !isAdmin || !canManageSemesters) {
+      setHasActiveSemester(null);
+      return;
+    }
+
+    void fetchActiveSemesterStatus();
+  }, [isLoggedIn, isAdmin, canManageSemesters]);
 
   const verifyFreshRole = async (accountNumber: string) => {
     try {
@@ -1892,11 +1918,11 @@ export function Header() {
                     {
                       icon: Calendar,
 
-                      label: "إنهاء الفصل",
+                      label: hasActiveSemester === false ? "بدء الفصل" : "إنهاء الفصل",
 
                       permKey: "إنهاء الفصل",
 
-                      path: "?action=end-semester",
+                      path: hasActiveSemester === false ? "/admin/semesters" : "?action=end-semester",
                     },
                   ].filter(({ permKey }) => hasPermission(permKey)).map(({ icon: Ic, label, path }) => (
                     <NavItem

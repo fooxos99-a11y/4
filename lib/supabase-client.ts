@@ -1,6 +1,49 @@
 import { createClient } from '@supabase/supabase-js';
 
 let browserSupabaseClient: ReturnType<typeof createClient> | null = null;
+let missingEnvWarningShown = false;
+
+function createUnavailableSupabaseClient(errorMessage: string) {
+	const error = new Error(errorMessage);
+
+	const unavailableResult = {
+		data: null,
+		error,
+		count: null,
+		status: 0,
+		statusText: errorMessage,
+	};
+
+	const createChain = (): any => new Proxy(function unavailableSupabaseMethod() {}, {
+		get(_target, property) {
+			if (property === 'then') {
+				return (resolve: (value: typeof unavailableResult) => void) => resolve(unavailableResult);
+			}
+
+			if (property === 'catch') {
+				return () => createChain();
+			}
+
+			if (property === 'finally') {
+				return (callback?: () => void) => {
+					callback?.();
+					return createChain();
+				};
+			}
+
+			return createChain();
+		},
+		apply() {
+			return createChain();
+		},
+	});
+
+	return new Proxy({} as ReturnType<typeof createClient>, {
+		get() {
+			return createChain();
+		},
+	});
+}
 
 function getSupabaseClient() {
 	if (browserSupabaseClient) {
@@ -11,7 +54,12 @@ function getSupabaseClient() {
 	const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 	if (!supabaseUrl || !supabaseKey) {
-		throw new Error('Supabase browser environment variables are not set');
+		if (!missingEnvWarningShown) {
+			console.warn('Supabase browser environment variables are not set');
+			missingEnvWarningShown = true;
+		}
+
+		return createUnavailableSupabaseClient('Supabase browser environment variables are not set');
 	}
 
 	browserSupabaseClient = createClient(supabaseUrl, supabaseKey);

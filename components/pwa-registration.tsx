@@ -10,6 +10,18 @@ export function PwaRegistration() {
       return
     }
 
+    if (process.env.NODE_ENV !== "production") {
+      navigator.serviceWorker.getRegistrations()
+        .then(async (registrations) => {
+          await Promise.all(registrations.map((registration) => registration.unregister()))
+          const cacheKeys = await caches.keys()
+          await Promise.all(cacheKeys.map((cacheKey) => caches.delete(cacheKey)))
+        })
+        .catch(() => undefined)
+
+      return undefined
+    }
+
     const registerServiceWorker = () => {
       navigator.serviceWorker
         .register("/sw.js", { updateViaCache: "none" })

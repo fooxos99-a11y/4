@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { supabase } from "@/lib/supabase-client";
 import { toast } from "@/hooks/use-toast";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -42,14 +41,11 @@ export default function EnrollPage() {
   useEffect(() => {
     const fetchEnrollmentStatus = async () => {
       try {
-        const { data, error } = await supabase
-          .from('programs')
-          .select('is_active')
-          .eq('id', '00000000-0000-0000-0000-000000000000')
-          .maybeSingle();
-        
-        if (!error && data) {
-          setIsEnrollmentOpen(data.is_active);
+        const response = await fetch("/api/public-enrollment", { cache: "no-store" });
+        const payload = await response.json();
+
+        if (response.ok && typeof payload.isEnrollmentOpen === "boolean") {
+          setIsEnrollmentOpen(payload.isEnrollmentOpen);
         }
       } catch (e) {
         console.error(e);
@@ -171,6 +167,23 @@ export default function EnrollPage() {
     return Math.max(limits.min, Math.min(limits.max, ayahNumber));
   };
 
+  const shouldKeepPartialDialogOpen = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    return Boolean(
+      target.closest("[data-slot='select-content']") ||
+      target.closest("[data-radix-popper-content-wrapper]"),
+    );
+  };
+
+  const handlePartialDialogOutsideInteraction = (event: Event) => {
+    if (shouldKeepPartialDialogOpen(event.target)) {
+      event.preventDefault();
+    }
+  };
+
   const openPartialRangeDialog = (juzNumber: number) => {
     const bounds = getJuzBounds(juzNumber);
     if (!bounds) {
@@ -288,18 +301,23 @@ export default function EnrollPage() {
     try {
       const contiguousRange = getContiguousSelectedJuzRange(formData.selectedJuzs);
       const memorizedAmount = serializedPartialJuzRanges || (contiguousRange ? `${contiguousRange.fromJuz}-${contiguousRange.toJuz}` : "");
-      const { error } = await supabase.from("enrollment_requests").insert([
-        {
-          full_name: formData.fullName,
-          guardian_phone: formData.guardianPhone,
-          id_number: formData.idNumber,
-          educational_stage: formData.educationalStage,
-          memorized_amount: memorizedAmount,
-          selected_juzs: formData.selectedJuzs,
-        },
-      ]);
+      const response = await fetch("/api/public-enrollment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          guardianPhone: formData.guardianPhone,
+          idNumber: formData.idNumber,
+          educationalStage: formData.educationalStage,
+          memorizedAmount,
+          selectedJuzs: formData.selectedJuzs,
+        }),
+      });
+      const payload = await response.json();
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(payload?.error || "حدث خطأ أثناء إرسال الطلب");
+      }
 
       toast({ title: "تم إرسال طلب الالتحاق بنجاح!", variant: "default" });
       setFormData({
@@ -521,7 +539,12 @@ export default function EnrollPage() {
       </Dialog>
 
       <Dialog open={isPartialRangeDialogOpen} onOpenChange={closePartialRangeDialog}>
-        <DialogContent className="max-w-[92vw] sm:max-w-[390px] rounded-[28px] border border-black/15 bg-[linear-gradient(180deg,#ffffff_0%,#fcfdff_100%)] p-0 shadow-[0_24px_60px_rgba(18,37,84,0.12)]" dir="rtl">
+        <DialogContent
+          className="max-w-[92vw] sm:max-w-[390px] rounded-[28px] border border-black/15 bg-[linear-gradient(180deg,#ffffff_0%,#fcfdff_100%)] p-0 shadow-[0_24px_60px_rgba(18,37,84,0.12)]"
+          dir="rtl"
+          onInteractOutside={handlePartialDialogOutsideInteraction}
+          onPointerDownOutside={handlePartialDialogOutsideInteraction}
+        >
           <DialogHeader className="border-b border-black/8 bg-transparent px-5 py-4 text-right">
             <DialogTitle className="text-right text-lg font-bold text-[#20335f]">الجزء {activePartialJuz || ""}</DialogTitle>
           </DialogHeader>
