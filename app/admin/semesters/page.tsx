@@ -393,7 +393,7 @@ export default function AdminSemestersPage() {
 
       await refreshSemesters()
       setNewSemesterName("")
-      toast({ title: "تم بدء الفصل", description: `تم بدء الفصل "${data.semester?.name || newSemesterName.trim()}" بنجاح` })
+      toast({ title: "تم انشاء الفصل بنجاح" })
     } catch (error) {
       toast({
         title: "خطأ",

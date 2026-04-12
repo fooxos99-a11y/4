@@ -1306,6 +1306,22 @@ export default function StudentPlansPage() {
     }, 180);
   };
 
+  const shouldKeepPlanDialogOpen = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+
+    return Boolean(
+      target.closest("[data-slot='select-content']") ||
+      target.closest("[data-slot='popover-content']") ||
+      target.closest("[data-radix-popper-content-wrapper]"),
+    );
+  };
+
+  const handlePlanDialogOutsideInteraction = (event: Event) => {
+    if (shouldKeepPlanDialogOpen(event.target)) {
+      event.preventDefault();
+    }
+  };
+
   // قائمة السور المتاحة لنهاية الخطة
   const endSurahOptions = (() => {
     if (!startNum) return startSurahOptions;
@@ -1673,6 +1689,8 @@ export default function StudentPlansPage() {
           showCloseButton={false}
           className="flex max-w-md w-[calc(100vw-1rem)] max-h-[92vh] flex-col bg-white rounded-2xl p-0 overflow-hidden"
           dir="rtl"
+          onInteractOutside={handlePlanDialogOutsideInteraction}
+          onPointerDownOutside={handlePlanDialogOutsideInteraction}
         >
           <DialogHeader className="px-6 py-5 border-b border-[#3453a7]/30 bg-gradient-to-r from-[#3453a7]/8 to-transparent">
             <DialogTitle className="flex w-full items-center justify-start gap-2 pl-1 text-left text-lg font-bold text-[#1a2332]">
