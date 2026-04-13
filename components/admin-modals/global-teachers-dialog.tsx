@@ -649,7 +649,7 @@ export function GlobalTeachersDialog() {
           setAddDialogView("single")
         }
       }}>
-        <DialogContent className={addDialogView === "bulk" ? "flex h-[92vh] w-[96vw] max-w-[1320px] flex-col rounded-2xl bg-white p-0 overflow-hidden" : "max-w-md rounded-2xl bg-white p-0 overflow-hidden"} dir="rtl" style={{ zIndex: 110 }}>
+        <DialogContent className={addDialogView === "bulk" ? "flex max-h-[96vh] !w-[99vw] !max-w-[1680px] sm:!max-w-[1680px] flex-col rounded-2xl bg-white p-0 overflow-hidden" : "max-w-md rounded-2xl bg-white p-0 overflow-hidden"} dir="rtl" style={{ zIndex: 110 }}>
           <DialogHeader className="border-b border-[#3453a7]/30 bg-gradient-to-r from-[#3453a7]/8 to-transparent px-6 py-5">
             <DialogTitle className="relative w-full text-center text-lg font-bold text-[#1a2332]">
               <Plus className="absolute right-0 top-1/2 h-5 w-5 -translate-y-1/2 text-[#4f73d1]" />
@@ -712,17 +712,10 @@ export function GlobalTeachersDialog() {
             </>
           ) : (
             <>
-              <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
+              <div className="px-4 py-4 sm:px-6 lg:px-8">
                 <div className="space-y-3 pr-1">
-                  {bulkTeachers.map((draft, index) => (
-                    <div key={draft.id} className="rounded-2xl border border-[#3453a7]/20 bg-white p-4 shadow-sm sm:p-5">
-                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="text-sm font-bold text-[#1a2332]">المعلم {index + 1}</div>
-                        <button type="button" onClick={() => removeBulkTeacherRow(draft.id)} className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                          حذف
-                        </button>
-                      </div>
+                  {bulkTeachers.map((draft) => (
+                    <div key={draft.id} className="rounded-2xl border border-[#3453a7]/20 bg-white p-4 shadow-sm sm:p-4">
                       <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(220px,1.45fr)_repeat(5,minmax(120px,1fr))]">
                         <div className="space-y-1.5">
                           <Label className="text-sm font-semibold text-[#1a2332]">اسم المعلم</Label>
@@ -752,7 +745,12 @@ export function GlobalTeachersDialog() {
                           </Select>
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-sm font-semibold text-[#1a2332]">المسمى الوظيفي</Label>
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-sm font-semibold text-[#1a2332]">المسمى الوظيفي</Label>
+                            <button type="button" onClick={() => removeBulkTeacherRow(draft.id)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-500 transition-colors hover:bg-red-50" aria-label="حذف المعلم">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                           <Select value={draft.role} onValueChange={(value) => updateBulkTeacher(draft.id, { role: value as TeacherRole })}>
                             <SelectTrigger className="h-10 rounded-xl border-[#3453a7]/40 text-sm focus:border-[#3453a7]"><SelectValue placeholder="اختر المسمى" /></SelectTrigger>
                             <SelectContent>
