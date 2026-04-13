@@ -158,7 +158,7 @@ export default function AdminPathwaysPage() {
 
   useEffect(() => {
     if (selectedHalaqah) {
-      loadLevels()
+      void loadLevels(selectedHalaqah)
       setSelectedLevel(1)
     }
   }, [selectedHalaqah])
@@ -189,13 +189,19 @@ export default function AdminPathwaysPage() {
     }
   }
 
-  async function loadLevels() {
-    if (!selectedHalaqah) return;
+  async function loadLevels(halaqah = selectedHalaqah) {
+    if (!halaqah) return [] as Level[]
     const supabase = getSupabase()
     const { data, error } = await supabase
-      .from("pathway_levels").select("*").eq("halaqah", selectedHalaqah).order("level_number")
+      .from("pathway_levels").select("*").eq("halaqah", halaqah).order("level_number")
 
-    if (!error && data) setLevels(data as Level[])
+    if (!error && data) {
+      const nextLevels = data as Level[]
+      setLevels(nextLevels)
+      return nextLevels
+    }
+
+    return [] as Level[]
   }
 
   async function loadNotificationTemplates() {
@@ -369,11 +375,19 @@ export default function AdminPathwaysPage() {
     const data = await response.json().catch(() => null)
 
     if (response.ok && data?.success) {
-      showNotification('تمت إضافة مستوى جديد بنجاح');
-      await loadLevels();
-      if (Number.isInteger(Number(data?.level?.level_number))) {
-        setSelectedLevel(Number(data.level.level_number))
+      const createdLevel = data?.level as Level | undefined
+      if (createdLevel) {
+        setLevels((current) => {
+          const exists = current.some((level) => level.id === createdLevel.id)
+          const nextLevels = exists ? current : [...current, createdLevel]
+          return [...nextLevels].sort((left, right) => left.level_number - right.level_number)
+        })
+        setSelectedLevel(createdLevel.level_number)
+      } else {
+        await loadLevels(selectedHalaqah)
       }
+
+      showNotification('تمت إضافة مستوى جديد بنجاح');
     } else {
       showNotification(data?.error || 'حدث خطأ أثناء إضافة المستوى');
     }
