@@ -24,7 +24,7 @@ import type { PreviousMemorizationRange } from "@/lib/quran-data"
 import { DEFAULT_EXAM_PORTION_SETTINGS, DEFAULT_EXAM_SETTINGS, EXAM_PORTION_SETTINGS_ID, EXAM_SETTINGS_ID } from "@/lib/site-settings-constants"
 import { formatExamPortionLabel, getEligibleExamJuzs, getEligibleExamPortions, type StudentExamPlanProgressSource } from "@/lib/student-exams"
 import { DEFAULT_EXAM_WHATSAPP_TEMPLATES, EXAM_WHATSAPP_SETTINGS_ID, normalizeExamWhatsAppTemplates, type ExamWhatsAppTemplates } from "@/lib/whatsapp-notification-templates"
-import { BellRing, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, ClipboardCheck, Pencil, Save, SlidersHorizontal, Trash2 } from "lucide-react"
+import { BellRing, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, ClipboardCheck, Save, SlidersHorizontal, Trash2 } from "lucide-react"
 
 type Circle = {
   id: string
@@ -104,8 +104,6 @@ type FailedExamActionForm = {
   action: FailedExamAction
   retestDate: string
 }
-
-type ScheduleDialogMode = "create" | "edit"
 
 const ALL_CIRCLES_VALUE = "__all_circles__"
 const OVERVIEW_PAGE_SIZE = 5
@@ -270,12 +268,11 @@ export default function AdminExamsPage() {
   const [isCircleDataLoading, setIsCircleDataLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
-  const [isSendingScheduleNotification, setIsSendingScheduleNotification] = useState(false)
+  const [sendingScheduleStudentId, setSendingScheduleStudentId] = useState<string | null>(null)
   const [isCancellingScheduleId, setIsCancellingScheduleId] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false)
   const [isSchedulesOverviewOpen, setIsSchedulesOverviewOpen] = useState(false)
-  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false)
   const [isFailedExamActionDialogOpen, setIsFailedExamActionDialogOpen] = useState(false)
   const [tableMissing, setTableMissing] = useState(false)
   const [schedulesTableMissing, setSchedulesTableMissing] = useState(false)
@@ -289,9 +286,7 @@ export default function AdminExamsPage() {
   const [portionMode, setPortionMode] = useState<ExamPortionType>(DEFAULT_EXAM_PORTION_SETTINGS.mode)
   const [selectedCircle, setSelectedCircle] = useState("")
   const [form, setForm] = useState<ExamFormState>(DEFAULT_FORM)
-  const [scheduleForm, setScheduleForm] = useState<ScheduleExamForm>(DEFAULT_SCHEDULE_FORM)
-  const [scheduleDialogMode, setScheduleDialogMode] = useState<ScheduleDialogMode>("create")
-  const [editingScheduleId, setEditingScheduleId] = useState("")
+  const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, ScheduleExamForm>>({})
   const [studentPlanProgressMap, setStudentPlanProgressMap] = useState<Record<string, StudentPlanProgressState>>({})
   const [isSavingTemplates, setIsSavingTemplates] = useState(false)
   const [overviewCircleFilter, setOverviewCircleFilter] = useState<string>(ALL_CIRCLES_VALUE)
@@ -356,6 +351,7 @@ export default function AdminExamsPage() {
         setStudents([])
         setExams([])
         setExamSchedules([])
+        setScheduleDrafts({})
         setStudentPlanProgressMap({})
         setIsCircleDataLoading(false)
         setForm((current) => ({ ...current, studentId: "", selectedJuz: "" }))
@@ -364,17 +360,19 @@ export default function AdminExamsPage() {
 
       try {
         setIsCircleDataLoading(true)
-        const [studentsResponse, examsResponse] = await Promise.all([
+        const [studentsResponse, examsResponse, schedulesResponse] = await Promise.all([
           fetch(`/api/students?circle=${encodeURIComponent(selectedCircle)}`, { cache: "no-store" }),
           fetch(`/api/exams?circle=${encodeURIComponent(selectedCircle)}`, { cache: "no-store" }),
+          fetch(`/api/exam-schedules?circle=${encodeURIComponent(selectedCircle)}`, { cache: "no-store" }),
         ])
 
-        if (!studentsResponse.ok || !examsResponse.ok) {
+        if (!studentsResponse.ok || !examsResponse.ok || !schedulesResponse.ok) {
           throw new Error("تعذر تحميل الطلاب أو الاختبارات")
         }
 
         const studentsData = await studentsResponse.json()
         const examsData = await examsResponse.json()
+        const schedulesData = await schedulesResponse.json()
         const loadedStudents = (studentsData.students || []) as Student[]
         const ids = loadedStudents.map((student) => student.id).join(",")
         const batchPlanResponse = loadedStudents.length > 0
@@ -393,6 +391,8 @@ export default function AdminExamsPage() {
 
         setStudents(loadedStudents)
         setExams((examsData.exams || []) as ExamRow[])
+        setExamSchedules(((schedulesData.schedules || []) as ExamScheduleRow[]).filter((schedule) => schedule.status === "scheduled"))
+        setSchedulesTableMissing(Boolean(schedulesData.tableMissing))
         setTableMissing(Boolean(examsData.tableMissing))
         setStudentPlanProgressMap(Object.fromEntries(planEntries))
 
@@ -419,6 +419,21 @@ export default function AdminExamsPage() {
   const settingsPreview = useMemo(() => fromSettingsForm(settingsForm), [settingsForm])
   const portionUnitLabel = portionMode === "hizb" ? "الحزب" : "الجزء"
   const filteredStudents = useMemo(() => students, [students])
+  const activeSchedulesByStudentId = useMemo(() => {
+    const grouped = new Map<string, ExamScheduleRow[]>()
+
+    for (const schedule of examSchedules) {
+      if (schedule.status !== "scheduled") {
+        continue
+      }
+
+      const current = grouped.get(schedule.student_id) || []
+      current.push(schedule)
+      grouped.set(schedule.student_id, current)
+    }
+
+    return grouped
+  }, [examSchedules])
   const selectedStudent = useMemo(() => filteredStudents.find((student) => student.id === form.studentId) || null, [filteredStudents, form.studentId])
   const selectedStudentPlanProgress = useMemo(() => {
     if (!form.studentId) {
@@ -434,6 +449,36 @@ export default function AdminExamsPage() {
   const passedPortionNumbers = useMemo(() => getPassedPortionNumbers(studentExams, portionMode), [studentExams, portionMode])
   const availablePortions = useMemo(() => eligiblePortions.filter((portion) => !passedPortionNumbers.has(portion.portionNumber)), [eligiblePortions, passedPortionNumbers])
   const availableJuzs = useMemo(() => availablePortions.map((portion) => portion.portionNumber), [availablePortions])
+  const studentScheduleRows = useMemo(() => {
+    return filteredStudents.map((student) => {
+      const studentPlanProgress = studentPlanProgressMap[student.id] || null
+      const studentExamsList = exams.filter((exam) => exam.student_id === student.id)
+      const studentPassedPortions = getPassedPortionNumbers(studentExamsList, portionMode)
+      const eligibleStudentPortions = getEligibleExamPortions(student, studentPlanProgress, portionMode)
+      const studentSchedules = [...(activeSchedulesByStudentId.get(student.id) || [])].sort((left, right) => left.exam_date.localeCompare(right.exam_date) || left.created_at.localeCompare(right.created_at))
+      const activeSchedule = studentSchedules[0] || null
+      const scheduledPortionNumbers = new Set(studentSchedules.map((schedule) => Number(schedule.portion_number || schedule.juz_number)))
+      const availableStudentPortions = eligibleStudentPortions.filter((portion) => !studentPassedPortions.has(portion.portionNumber) && !scheduledPortionNumbers.has(portion.portionNumber))
+      const draft = scheduleDrafts[student.id]
+      const draftPortionNumber = activeSchedule
+        ? String(activeSchedule.portion_number || activeSchedule.juz_number)
+        : draft?.juzNumber && availableStudentPortions.some((portion) => String(portion.portionNumber) === draft.juzNumber)
+          ? draft.juzNumber
+          : (availableStudentPortions[0] ? String(availableStudentPortions[0].portionNumber) : "")
+      const draftExamDate = activeSchedule?.exam_date || draft?.examDate || getTodayDate()
+      const draftPortionLabel = activeSchedule?.exam_portion_label || availableStudentPortions.find((portion) => String(portion.portionNumber) === draftPortionNumber)?.label || ""
+
+      return {
+        student,
+        activeSchedule,
+        availablePortions: availableStudentPortions,
+        draftPortionNumber,
+        draftExamDate,
+        draftPortionLabel,
+        hasEligiblePortions: eligibleStudentPortions.length > 0,
+      }
+    })
+  }, [activeSchedulesByStudentId, exams, filteredStudents, portionMode, scheduleDrafts, studentPlanProgressMap])
   const scorePreview = useMemo(
     () => calculateExamScore({ alerts: parseCount(form.alertsCount), mistakes: parseCount(form.mistakesCount) }, settingsPreview),
     [form.alertsCount, form.mistakesCount, settingsPreview],
@@ -460,29 +505,6 @@ export default function AdminExamsPage() {
   }, [availableJuzs, selectedStudent])
 
   useEffect(() => {
-    if (!selectedStudent) {
-      setScheduleForm((current) => ({ ...current, juzNumber: "" }))
-      return
-    }
-
-    setScheduleForm((current) => {
-      const canKeepSelectedJuz = current.juzNumber && availableJuzs.includes(Number(current.juzNumber))
-      if (canKeepSelectedJuz) {
-        return current
-      }
-
-      const nextJuz = form.selectedJuz && availableJuzs.includes(Number(form.selectedJuz))
-        ? form.selectedJuz
-        : (availableJuzs[0] ? String(availableJuzs[0]) : "")
-
-      return {
-        ...current,
-        juzNumber: nextJuz,
-      }
-    })
-  }, [availableJuzs, selectedStudent, form.selectedJuz])
-
-  useEffect(() => {
     setForm((current) => {
       const nextStudentId = filteredStudents.some((student) => student.id === current.studentId)
         ? current.studentId
@@ -502,27 +524,23 @@ export default function AdminExamsPage() {
     })
   }, [filteredStudents])
 
-  const loadStudentSchedules = async (studentId: string) => {
-    if (!studentId) {
+  const loadCircleSchedules = async (circleName: string) => {
+    if (!circleName) {
       setExamSchedules([])
       setSchedulesTableMissing(false)
       return
     }
 
     try {
-      const response = await fetch(`/api/exam-schedules?student_id=${encodeURIComponent(studentId)}`, { cache: "no-store" })
+      const response = await fetch(`/api/exam-schedules?circle=${encodeURIComponent(circleName)}`, { cache: "no-store" })
       const data = await response.json()
-      setExamSchedules((data.schedules || []) as ExamScheduleRow[])
+      setExamSchedules(((data.schedules || []) as ExamScheduleRow[]).filter((schedule) => schedule.status === "scheduled"))
       setSchedulesTableMissing(Boolean(data.tableMissing))
     } catch (error) {
       console.error("[admin-exams] load schedules:", error)
       setExamSchedules([])
     }
   }
-
-  useEffect(() => {
-    void loadStudentSchedules(form.studentId)
-  }, [form.studentId])
 
   const loadOverviewSchedules = async (circleFilter: string) => {
     try {
@@ -574,6 +592,16 @@ export default function AdminExamsPage() {
 
   const handleNotificationTemplateChange = (field: keyof NotificationTemplatesForm, value: string) => {
     setNotificationTemplatesForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const updateScheduleDraft = (studentId: string, nextValues: Partial<ScheduleExamForm>) => {
+    setScheduleDrafts((current) => ({
+      ...current,
+      [studentId]: {
+        juzNumber: nextValues.juzNumber ?? current[studentId]?.juzNumber ?? "",
+        examDate: nextValues.examDate ?? current[studentId]?.examDate ?? getTodayDate(),
+      },
+    }))
   }
 
   const handlePortionModeChange = (value: string) => {
@@ -738,7 +766,7 @@ export default function AdminExamsPage() {
     setExams((examsData.exams || []) as ExamRow[])
     setTableMissing(Boolean(examsData.tableMissing))
     setStudentPlanProgressMap(Object.fromEntries(planEntries))
-    await loadStudentSchedules(form.studentId)
+    await loadCircleSchedules(selectedCircle)
   }
 
   const handleSaveExam = async () => {
@@ -797,69 +825,39 @@ export default function AdminExamsPage() {
     }
   }
 
-  const handleOpenScheduleDialog = (schedule?: ExamScheduleRow) => {
-    if (!schedule && !form.studentId) {
-      void showAlert("اختر الطالب أولاً", "تنبيه")
+  const handleSendScheduleNotification = async (studentId: string) => {
+    const targetStudent = studentScheduleRows.find((row) => row.student.id === studentId)
+    if (!targetStudent) {
+      await showAlert("تعذر العثور على الطالب المحدد", "تنبيه")
       return
     }
 
-    if (!schedule && availableJuzs.length === 0) {
-      void showAlert(`لا يوجد ${portionUnitLabel} متاح لإرسال تنبيه اختبار لهذا الطالب حالياً`, "تنبيه")
+    if (targetStudent.activeSchedule) {
       return
     }
 
-    if (schedule) {
-      setSelectedCircle(schedule.halaqah)
-      setForm((current) => ({ ...current, studentId: schedule.student_id }))
-      setScheduleDialogMode("edit")
-      setEditingScheduleId(schedule.id)
-      setScheduleForm({
-        juzNumber: String(schedule.portion_number || schedule.juz_number),
-        examDate: schedule.exam_date,
-      })
-    } else {
-      setScheduleDialogMode("create")
-      setEditingScheduleId("")
-      setScheduleForm({
-        juzNumber: form.selectedJuz && availableJuzs.includes(Number(form.selectedJuz))
-          ? form.selectedJuz
-          : String(availableJuzs[0]),
-        examDate: DEFAULT_SCHEDULE_FORM.examDate,
-      })
-    }
-
-    setIsScheduleDialogOpen(true)
-  }
-
-  const handleSendScheduleNotification = async () => {
-    if (!form.studentId) {
-      await showAlert("اختر الطالب أولاً", "تنبيه")
-      return
-    }
-
-    if (!scheduleForm.juzNumber) {
+    if (!targetStudent.draftPortionNumber) {
       await showAlert(`اختر ${portionUnitLabel} المراد جدولة اختباره`, "تنبيه")
       return
     }
 
-    if (!scheduleForm.examDate) {
+    if (!targetStudent.draftExamDate) {
       await showAlert("اختر تاريخ الاختبار", "تنبيه")
       return
     }
 
     try {
-      setIsSendingScheduleNotification(true)
+      setSendingScheduleStudentId(studentId)
 
       const response = await fetch("/api/exam-schedules", {
-        method: scheduleDialogMode === "edit" ? "PATCH" : "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: editingScheduleId || undefined,
-          student_id: form.studentId,
+          student_id: studentId,
           portion_type: portionMode,
-          portion_number: Number(scheduleForm.juzNumber),
-          exam_portion_label: availablePortions.find((portion) => portion.portionNumber === Number(scheduleForm.juzNumber))?.label || formatExamPortionLabel(Number(scheduleForm.juzNumber), "", portionMode),
-          exam_date: scheduleForm.examDate,
+          portion_number: Number(targetStudent.draftPortionNumber),
+          exam_portion_label: targetStudent.draftPortionLabel || formatExamPortionLabel(Number(targetStudent.draftPortionNumber), "", portionMode),
+          exam_date: targetStudent.draftExamDate,
         }),
       })
 
@@ -868,24 +866,15 @@ export default function AdminExamsPage() {
         throw new Error(data.error || "تعذر إرسال تنبيه الاختبار")
       }
 
-      setIsScheduleDialogOpen(false)
-      setEditingScheduleId("")
-      setScheduleDialogMode("create")
-      await loadStudentSchedules(form.studentId)
+      await loadCircleSchedules(selectedCircle)
       if (isSchedulesOverviewOpen) {
         await loadOverviewSchedules(overviewCircleFilter)
       }
-      await showAlert(
-        scheduleDialogMode === "edit"
-          ? "تم تحديث موعد الاختبار، مع إشعار الطالب داخل المنصة وإرسال رسالة لولي الأمر عبر الواتساب"
-          : "تمت جدولة الاختبار، مع إشعار الطالب داخل المنصة وإرسال رسالة لولي الأمر عبر الواتساب",
-        "نجاح",
-      )
     } catch (error) {
       console.error("[admin-exams] send schedule notification:", error)
       await showAlert(error instanceof Error ? error.message : "حدث خطأ أثناء إرسال تنبيه الاختبار", "خطأ")
     } finally {
-      setIsSendingScheduleNotification(false)
+      setSendingScheduleStudentId(null)
     }
   }
 
@@ -907,7 +896,7 @@ export default function AdminExamsPage() {
         throw new Error(data.error || "تعذر إلغاء موعد الاختبار")
       }
 
-      await loadStudentSchedules(targetStudentId)
+      await loadCircleSchedules(selectedCircle)
       if (isSchedulesOverviewOpen) {
         await loadOverviewSchedules(overviewCircleFilter)
       }
@@ -940,18 +929,6 @@ export default function AdminExamsPage() {
           ) : null}
 
           <div className="flex flex-col items-stretch justify-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            {form.studentId ? (
-              <Button
-                type="button"
-                onClick={() => handleOpenScheduleDialog()}
-                disabled={tableMissing || !selectedStudent || availableJuzs.length === 0}
-                className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7] disabled:opacity-60 sm:w-auto"
-              >
-                <BellRing className="me-2 h-4 w-4" />
-                جدولة الاختبارات
-              </Button>
-            ) : null}
-
             <Button type="button" onClick={() => setIsSchedulesOverviewOpen(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
               <CalendarDays className="me-2 h-4 w-4" />
               المواعيد
@@ -1006,6 +983,101 @@ export default function AdminExamsPage() {
                 </div>
               </div>
             </div>
+
+            {selectedCircle ? (
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center justify-start gap-2 text-right">
+                  <BellRing className="h-5 w-5 text-[#3453a7]" />
+                  <div className="text-lg font-black text-[#1a2332]">جدولة الاختبارات المباشرة</div>
+                </div>
+
+                {schedulesTableMissing ? (
+                  <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-4 text-right text-sm font-bold leading-7 text-amber-800">
+                    جدول مواعيد الاختبارات غير موجود بعد. شغّل ملف scripts/045_create_exam_schedules.sql أولاً.
+                  </div>
+                ) : isCircleDataLoading ? (
+                  <div className="flex min-h-[180px] items-center justify-center rounded-[24px] border border-dashed border-[#d7e3f2] bg-[#fafcff]">
+                    <SiteLoader />
+                  </div>
+                ) : studentScheduleRows.length > 0 ? (
+                  <div className="overflow-x-auto rounded-[24px] border border-[#ebeff5]">
+                    <Table className="min-w-[880px]">
+                      <TableHeader>
+                        <TableRow className="bg-[#f8fafc] hover:bg-[#f8fafc]">
+                          <TableHead className="text-right font-black text-[#475569]">الطالب</TableHead>
+                          <TableHead className="text-right font-black text-[#475569]">{portionUnitLabel}</TableHead>
+                          <TableHead className="text-right font-black text-[#475569]">التاريخ</TableHead>
+                          <TableHead className="text-right font-black text-[#475569]">الحالة</TableHead>
+                          <TableHead className="text-right font-black text-[#475569]">الإجراء</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {studentScheduleRows.map((row) => {
+                          const isSending = sendingScheduleStudentId === row.student.id
+                          const isScheduled = Boolean(row.activeSchedule)
+
+                          return (
+                            <TableRow key={`schedule-row-${row.student.id}`}>
+                              <TableCell className="text-right font-bold text-[#1f2937]">{row.student.name}</TableCell>
+                              <TableCell className="text-right">
+                                {isScheduled ? (
+                                  <div className="text-sm font-black text-[#1f2937]">{row.activeSchedule?.exam_portion_label || "-"}</div>
+                                ) : row.availablePortions.length > 0 ? (
+                                  <Select value={row.draftPortionNumber || undefined} onValueChange={(value) => updateScheduleDraft(row.student.id, { juzNumber: value })} dir="rtl">
+                                    <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-right">
+                                      <SelectValue placeholder={`اختر ${portionUnitLabel}`} />
+                                    </SelectTrigger>
+                                    <SelectContent dir="rtl">
+                                      {row.availablePortions.map((portion) => (
+                                        <SelectItem key={`row-portion-${row.student.id}-${portion.portionType}-${portion.portionNumber}`} value={String(portion.portionNumber)}>{portion.label}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <div className="text-sm font-bold text-[#64748b]">لا يوجد {portionUnitLabel} متاح</div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Input
+                                  type="date"
+                                  value={row.draftExamDate}
+                                  onChange={(event) => updateScheduleDraft(row.student.id, { examDate: event.target.value })}
+                                  disabled={isScheduled}
+                                  className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold disabled:cursor-not-allowed disabled:opacity-70"
+                                />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {isScheduled ? (
+                                  <Badge className="border-0 bg-[#ecfdf5] px-3 py-1 text-xs font-black text-[#166534]">تم الإرسال</Badge>
+                                ) : row.hasEligiblePortions ? (
+                                  <Badge className="border-0 bg-[#eff6ff] px-3 py-1 text-xs font-black text-[#3453a7]">جاهز للإرسال</Badge>
+                                ) : (
+                                  <Badge className="border-0 bg-[#f8fafc] px-3 py-1 text-xs font-black text-[#64748b]">لا يوجد محفوظ مؤهل</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  type="button"
+                                  onClick={() => handleSendScheduleNotification(row.student.id)}
+                                  disabled={isScheduled || isSending || !row.draftPortionNumber || !row.draftExamDate}
+                                  className="h-11 rounded-2xl bg-[#3453a7] px-5 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#e2e8f0] disabled:text-[#64748b]"
+                                >
+                                  {isScheduled ? "تم الإرسال" : isSending ? "جاري الإرسال..." : "إرسال"}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="rounded-[24px] border border-dashed border-[#d7e3f2] bg-white px-5 py-6 text-center text-sm font-black text-[#64748b]">
+                    لا يوجد طلاب في الحلقة المختارة.
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             {!form.studentId ? (
               <div className="mt-2 rounded-[24px] border border-dashed border-[#d7e3f2] bg-white px-5 py-6 text-center text-sm font-black text-[#64748b]">
@@ -1309,10 +1381,6 @@ export default function AdminExamsPage() {
                               </div>
 
                               <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
-                                <Button type="button" variant="outline" onClick={() => handleOpenScheduleDialog(schedule)} className="h-9 min-w-[96px] flex-1 rounded-xl border-[#d7e3f2] bg-white px-3 text-xs font-black text-[#1a2332] hover:bg-[#f8fbff] sm:flex-none">
-                                  <Pencil className="me-1.5 h-3.5 w-3.5" />
-                                  تعديل
-                                </Button>
                                 <Button type="button" variant="outline" onClick={() => handleCancelSchedule(schedule.id, schedule.student_id)} disabled={isCancellingScheduleId === schedule.id} className="h-9 min-w-[96px] flex-1 rounded-xl border-[#fee2e2] bg-white px-3 text-xs font-black text-[#b91c1c] hover:bg-[#fff7f7] disabled:opacity-60 sm:flex-none">
                                   <Trash2 className="me-1.5 h-3.5 w-3.5" />
                                   {isCancellingScheduleId === schedule.id ? "جاري الإلغاء..." : "إلغاء"}
@@ -1345,50 +1413,6 @@ export default function AdminExamsPage() {
                 <div className="flex justify-end border-t border-[#e5edf6] px-4 py-4 sm:px-6">
                   <Button type="button" variant="outline" onClick={() => setIsSchedulesOverviewOpen(false)} className="h-11 rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] hover:bg-[#f8fbff]">
                     إغلاق
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
-            <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
-              <div className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] bg-white">
-                <DialogHeader className="border-b border-[#e5edf6] px-6 py-5">
-                  <DialogTitle className="flex w-full items-center justify-start gap-2 text-left text-2xl font-black text-[#1a2332]">
-                    <BellRing className="h-5 w-5 text-[#3453a7]" />
-                    {scheduleDialogMode === "edit" ? "تعديل موعد اختبار" : "جدولة الاختبارات"}
-                  </DialogTitle>
-                </DialogHeader>
-
-                <div className="grid gap-5 overflow-y-auto px-6 py-6">
-                  <div className="space-y-2 text-right">
-                    <Label className="text-sm font-black text-[#334155]">{portionUnitLabel}</Label>
-                    <Select value={scheduleForm.juzNumber || undefined} onValueChange={(value) => setScheduleForm((current) => ({ ...current, juzNumber: value }))} dir="rtl">
-                      <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white">
-                        <SelectValue placeholder={`اختر ${portionUnitLabel}`} />
-                      </SelectTrigger>
-                      <SelectContent dir="rtl">
-                        {availablePortions.map((portion) => (
-                          <SelectItem key={`${portion.portionType}-${portion.portionNumber}`} value={String(portion.portionNumber)}>{portion.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2 text-right">
-                    <Label className="text-sm font-black text-[#334155]">تاريخ الاختبار</Label>
-                    <Input type="date" value={scheduleForm.examDate} onChange={(event) => setScheduleForm((current) => ({ ...current, examDate: event.target.value }))} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 border-t border-[#e5edf6] px-6 py-4">
-                  <Button type="button" variant="outline" onClick={() => setIsScheduleDialogOpen(false)} className="h-11 rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] hover:bg-[#f8fbff]">
-                    إغلاق
-                  </Button>
-                  <Button type="button" onClick={handleSendScheduleNotification} disabled={isSendingScheduleNotification} className="h-11 rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7]">
-                    <BellRing className="me-2 h-4 w-4" />
-                    {isSendingScheduleNotification ? (scheduleDialogMode === "edit" ? "جاري التحديث..." : "جاري الحفظ...") : "حفظ وإرسال"}
                   </Button>
                 </div>
               </div>

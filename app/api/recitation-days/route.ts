@@ -445,6 +445,17 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: targetHalaqah ? "لا يوجد طلاب في الحلقة المحددة داخل يوم السرد الحالي" : "لا يوجد طلاب لإرسال إشعار الإنهاء" }, { status: 400 })
     }
 
+    const recipientStudentIds = recipientStudents.map((student) => String(student.student_id || "").trim()).filter(Boolean)
+    const { data: recipientContacts, error: recipientContactsError } = recipientStudentIds.length > 0
+      ? await supabase.from("students").select("id, guardian_phone").in("id", recipientStudentIds)
+      : { data: [], error: null }
+
+    if (recipientContactsError) {
+      throw recipientContactsError
+    }
+
+    const guardianPhoneByStudentId = new Map((recipientContacts || []).map((student) => [String(student.id), student.guardian_phone || null]))
+
     const archiveTimestamp = new Date().toISOString()
     const recipientsByHalaqah = recipientStudents.reduce<Map<string, typeof recipientStudents>>((groups, student) => {
       const halaqahKey = String(student.halaqah || "").trim() || "__no_halaqah__"
@@ -510,6 +521,20 @@ export async function PATCH(request: Request) {
         throw deleteOpenDayError
       }
     }
+
+    await sendLifecycleNotifications({
+      supabase,
+      phase: "end",
+      recipients: recipientStudents.map((student) => ({
+        student_id: student.student_id,
+        student_name: student.student_name,
+        account_number: student.account_number,
+        halaqah: student.halaqah,
+        guardian_phone: guardianPhoneByStudentId.get(String(student.student_id)) || null,
+      })),
+      sessionUserId: auth.session.id,
+      date: formatRecitationDateRange(openDay.recitation_date, openDay.recitation_end_date),
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -263,7 +263,6 @@ export default function AdminRecitationDayPage() {
   const [isSavingLifecycleTemplates, setIsSavingLifecycleTemplates] = useState(false)
   const [isSavingGradingSettings, setIsSavingGradingSettings] = useState(false)
   const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false)
-  const [isStartTemplatesDialogOpen, setIsStartTemplatesDialogOpen] = useState(false)
   const [isGradingSettingsDialogOpen, setIsGradingSettingsDialogOpen] = useState(false)
 
   async function loadNotificationTemplates() {
@@ -738,6 +737,39 @@ export default function AdminRecitationDayPage() {
     }
   }
 
+  async function saveMessageTemplates() {
+    const lifecycleSaved = await saveLifecycleNotificationTemplates()
+    if (!lifecycleSaved) {
+      return false
+    }
+
+    try {
+      setIsSavingTemplates(true)
+      const response = await fetch("/api/site-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: RECITATION_DAY_NOTIFICATION_SETTINGS_ID,
+          value: notificationTemplatesForm,
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "تعذر حفظ قوالب التقييم النهائي")
+      }
+
+      setNotificationTemplatesForm(normalizeRecitationDayNotificationTemplates(notificationTemplatesForm))
+      toast({ title: "تم حفظ القوالب", description: "سيتم استخدام القوالب عند بدء يوم السرد وحفظ التقييم النهائي" })
+      return true
+    } catch (error) {
+      toast({ title: "تعذر حفظ القوالب", description: error instanceof Error ? error.message : "حدث خطأ غير متوقع", variant: "destructive" })
+      return false
+    } finally {
+      setIsSavingTemplates(false)
+    }
+  }
+
   function renderLifecycleTemplateFields(templateKey: LifecycleTemplateKey) {
     const title = templateKey === "start" ? "رسائل بدء يوم السرد" : "رسائل إنهاء يوم السرد"
 
@@ -814,7 +846,12 @@ export default function AdminRecitationDayPage() {
 
         <Card className="rounded-[30px] border-[#dde6f0] bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
           <CardHeader className="text-right">
-            <CardTitle className="flex w-full items-center justify-start gap-2 text-2xl font-black text-[#1a2332]"><CalendarDays className="h-6 w-6 text-[#3453a7]" /><span>يوم السرد</span></CardTitle>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="flex w-full items-center justify-start gap-2 text-2xl font-black text-[#1a2332]"><CalendarDays className="h-6 w-6 text-[#3453a7]" /><span>يوم السرد</span></CardTitle>
+              <Button type="button" variant="outline" onClick={() => setIsTemplatesDialogOpen(true)} className="h-11 rounded-full border-[#d8e4fb] px-6 text-[#3453a7] hover:bg-[#f5f8ff] sm:w-auto">
+                قوالب الرسائل
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {!currentDay ? (
@@ -893,12 +930,7 @@ export default function AdminRecitationDayPage() {
         <DialogContent className="max-h-[88vh] w-[calc(100vw-1.5rem)] max-w-xl overflow-y-auto rounded-[28px] border border-[#dbe5f1] p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)]" dir="rtl" onOpenAutoFocus={(event) => event.preventDefault()}>
           <DialogHeader className="border-b border-[#e8eef6] px-4 py-4 text-right sm:px-6">
             <DialogDescription className="sr-only">نافذة بدء يوم السرد وتحديد التاريخ ونطاق الطلاب.</DialogDescription>
-            <div className="flex items-center justify-between gap-3">
-              <DialogTitle className="text-right text-lg font-black text-[#1a2332] sm:text-xl">بدء يوم السرد</DialogTitle>
-              <Button type="button" variant="outline" onClick={() => setIsStartTemplatesDialogOpen(true)} className="h-10 rounded-full border-[#d8e4fb] px-4 text-[#3453a7] hover:bg-[#f5f8ff] sm:h-11 sm:px-5">
-                القوالب
-              </Button>
-            </div>
+            <DialogTitle className="text-right text-lg font-black text-[#1a2332] sm:text-xl">بدء يوم السرد</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-5 px-4 py-5 text-right sm:px-6">
@@ -933,49 +965,11 @@ export default function AdminRecitationDayPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isStartTemplatesDialogOpen} onOpenChange={setIsStartTemplatesDialogOpen}>
-        <DialogContent className="max-h-[88vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-y-auto rounded-[28px] border border-[#dbe5f1] p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)]" dir="rtl" onOpenAutoFocus={(event) => event.preventDefault()}>
-          <DialogHeader className="border-b border-[#e8eef6] px-4 py-4 sm:px-6">
-            <DialogDescription className="sr-only">نافذة تعديل قوالب رسائل بدء يوم السرد.</DialogDescription>
-            <DialogTitle className="text-right text-lg font-black text-[#1a2332] sm:text-xl">قوالب بدء يوم السرد</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 px-4 py-5 text-right sm:px-6">
-            {renderLifecycleTemplateFields("start")}
-
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-start">
-              <Button type="button" variant="outline" onClick={() => setIsStartTemplatesDialogOpen(false)} className="h-11 rounded-full border-[#d8e4fb] px-6">
-                إغلاق
-              </Button>
-              <Button
-                type="button"
-                onClick={async () => {
-                  const saved = await saveLifecycleNotificationTemplates()
-                  if (saved) {
-                    setIsStartTemplatesDialogOpen(false)
-                    toast({ title: "تم حفظ القوالب", description: "سيتم استخدام القوالب عند بدء يوم السرد" })
-                  }
-                }}
-                disabled={isSavingLifecycleTemplates}
-                className="h-11 rounded-full bg-[#3453a7] px-6 text-white hover:bg-[#28448e]"
-              >
-                {isSavingLifecycleTemplates ? "جاري الحفظ..." : "حفظ القوالب"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={isArchiveConfirmOpen} onOpenChange={setIsArchiveConfirmOpen}>
         <DialogContent className="max-h-[88vh] w-[calc(100vw-1.5rem)] max-w-xl overflow-y-auto rounded-[28px] border border-[#dbe5f1] p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)]" dir="rtl" onOpenAutoFocus={(event) => event.preventDefault()}>
           <DialogHeader className="border-b border-[#e8eef6] px-4 py-4 text-right sm:px-6">
             <DialogDescription className="sr-only">نافذة تأكيد إنهاء يوم السرد وتحديد نطاق الحلقات.</DialogDescription>
-            <div className="flex items-center justify-between gap-3">
-              <DialogTitle className="text-right text-lg font-black text-[#1a2332] sm:text-xl">إنهاء يوم السرد</DialogTitle>
-              <Button type="button" variant="outline" onClick={() => setIsTemplatesDialogOpen(true)} className="h-10 rounded-full border-[#d8e4fb] px-4 text-[#3453a7] hover:bg-[#f5f8ff] sm:h-11 sm:px-5">
-                القوالب
-              </Button>
-            </div>
+            <DialogTitle className="text-right text-lg font-black text-[#1a2332] sm:text-xl">إنهاء يوم السرد</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-5 px-4 py-5 text-right sm:px-6">
@@ -1003,9 +997,9 @@ export default function AdminRecitationDayPage() {
       <Dialog open={isTemplatesDialogOpen} onOpenChange={setIsTemplatesDialogOpen}>
         <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto" dir="rtl" onOpenAutoFocus={(event) => event.preventDefault()}>
           <DialogHeader>
-            <DialogDescription className="sr-only">نافذة قوالب تنبيهات يوم السرد داخل المنصة وعبر واتساب.</DialogDescription>
+            <DialogDescription className="sr-only">نافذة قوالب بدء يوم السرد والتقييم النهائي داخل المنصة وعبر واتساب.</DialogDescription>
             <div className="relative text-right">
-              <DialogTitle className="text-right text-xl font-black">قوالب تنبيه يوم السرد</DialogTitle>
+              <DialogTitle className="text-right text-xl font-black">قوالب رسائل يوم السرد</DialogTitle>
               <div className="absolute left-0 top-0 flex items-center">
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1014,7 +1008,7 @@ export default function AdminRecitationDayPage() {
                     </span>
                   </TooltipTrigger>
                   <TooltipContent hideArrow side="left" sideOffset={8} className="max-w-sm rounded-xl bg-[#1a2332] px-4 py-3 text-right text-xs leading-6 text-white">
-                    المتغيرات المتاحة: <span className="font-bold">{'{name}'}</span> اسم الطالب، <span className="font-bold">{'{halaqah}'}</span> اسم الحلقة، <span className="font-bold">{'{evaluator}'}</span> اسم المقيّم، <span className="font-bold">{'{grade}'}</span> الدرجة، <span className="font-bold">{'{errors}'}</span> الأخطاء، <span className="font-bold">{'{alerts}'}</span> التنبيهات، <span className="font-bold">{'{date}'}</span> التاريخ.
+                    في قالب بدء يوم السرد: <span className="font-bold">{'{name}'}</span> اسم الطالب، <span className="font-bold">{'{halaqah}'}</span> اسم الحلقة، <span className="font-bold">{'{date}'}</span> التاريخ. وفي قالب التقييم النهائي تضاف أيضًا: <span className="font-bold">{'{evaluator}'}</span> اسم المقيّم، <span className="font-bold">{'{grade}'}</span> الدرجة، <span className="font-bold">{'{errors}'}</span> الأخطاء، <span className="font-bold">{'{alerts}'}</span> التنبيهات.
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -1022,6 +1016,11 @@ export default function AdminRecitationDayPage() {
           </DialogHeader>
 
           <div className="space-y-4 text-right">
+            {renderLifecycleTemplateFields("start")}
+
+            <div className="space-y-2 pt-2">
+              <div className="text-base font-black text-[#1a2332] sm:text-lg">رسائل التقييم النهائي</div>
+            </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="space-y-2">
                 <div className="text-sm font-bold text-[#1a2332]">تنبيه الطالب داخل المنصة</div>
@@ -1044,8 +1043,13 @@ export default function AdminRecitationDayPage() {
               <Button type="button" variant="outline" onClick={() => setIsTemplatesDialogOpen(false)} className="h-11 rounded-full border-[#d8e4fb] px-6">
                 إغلاق
               </Button>
-              <Button type="button" onClick={saveNotificationTemplates} disabled={isSavingTemplates} className="h-11 rounded-full bg-[#3453a7] px-6 text-white hover:bg-[#28448e]">
-                {isSavingTemplates ? "جاري الحفظ..." : "حفظ القوالب"}
+              <Button type="button" onClick={async () => {
+                const saved = await saveMessageTemplates()
+                if (saved) {
+                  setIsTemplatesDialogOpen(false)
+                }
+              }} disabled={isSavingTemplates || isSavingLifecycleTemplates} className="h-11 rounded-full bg-[#3453a7] px-6 text-white hover:bg-[#28448e]">
+                {isSavingTemplates || isSavingLifecycleTemplates ? "جاري الحفظ..." : "حفظ القوالب"}
               </Button>
             </div>
           </div>
