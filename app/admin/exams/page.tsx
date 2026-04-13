@@ -24,7 +24,7 @@ import type { PreviousMemorizationRange } from "@/lib/quran-data"
 import { DEFAULT_EXAM_PORTION_SETTINGS, DEFAULT_EXAM_SETTINGS, EXAM_PORTION_SETTINGS_ID, EXAM_SETTINGS_ID } from "@/lib/site-settings-constants"
 import { formatExamPortionLabel, getEligibleExamJuzs, getEligibleExamPortions, type StudentExamPlanProgressSource } from "@/lib/student-exams"
 import { DEFAULT_EXAM_WHATSAPP_TEMPLATES, EXAM_WHATSAPP_SETTINGS_ID, normalizeExamWhatsAppTemplates, type ExamWhatsAppTemplates } from "@/lib/whatsapp-notification-templates"
-import { BellRing, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, ClipboardCheck, Save, SlidersHorizontal, Trash2 } from "lucide-react"
+import { BellRing, CalendarDays, ChevronLeft, ChevronRight, CircleAlert, ClipboardCheck, Loader2, Save, SlidersHorizontal, Trash2 } from "lucide-react"
 
 type Circle = {
   id: string
@@ -604,6 +604,22 @@ export default function AdminExamsPage() {
     }))
   }
 
+  const selectStudentForExam = (studentId: string) => {
+    setForm((current) => {
+      if (current.studentId === studentId) {
+        return current
+      }
+
+      return {
+        ...current,
+        studentId,
+        selectedJuz: "",
+        alertsCount: "0",
+        mistakesCount: "0",
+      }
+    })
+  }
+
   const handlePortionModeChange = (value: string) => {
     const nextMode = value === "hizb" ? "hizb" : "juz"
     setPortionMode(nextMode)
@@ -943,7 +959,7 @@ export default function AdminExamsPage() {
           <div className="rounded-[28px] border border-[#dbe5f1] bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.04)]">
             <div className="text-right">
               <div className="flex max-w-full flex-col gap-4 md:flex-row md:items-end">
-                <div className="w-full min-w-0 space-y-2 text-right md:w-[220px]">
+                <div className="w-full min-w-0 space-y-2 text-right md:w-[280px]">
                   <Label className="text-sm font-black text-[#334155]">الحلقة</Label>
                   <Select value={selectedCircle} onValueChange={setSelectedCircle} dir="rtl">
                     <SelectTrigger className="h-12 rounded-2xl border-[#d7e3f2] bg-white px-4 shadow-sm">
@@ -953,31 +969,6 @@ export default function AdminExamsPage() {
                       {circles.map((circle) => (
                         <SelectItem key={circle.id} value={circle.name}>{circle.name}</SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="w-full min-w-0 space-y-2 text-right md:w-[320px]">
-                  <Label className="text-sm font-black text-[#334155]">الطالب</Label>
-                  <Select
-                    value={form.studentId || undefined}
-                    onValueChange={(value) => setForm((current) => ({
-                      ...current,
-                      studentId: value,
-                      selectedJuz: "",
-                      alertsCount: "0",
-                      mistakesCount: "0",
-                    }))}
-                    dir="rtl"
-                    disabled={!selectedCircle || isCircleDataLoading || filteredStudents.length === 0}
-                  >
-                    <SelectTrigger className="h-12 rounded-2xl border-[#d7e3f2] bg-white px-4 shadow-sm disabled:cursor-not-allowed disabled:opacity-60">
-                      <SelectValue placeholder={selectedCircle ? (isCircleDataLoading ? "جاري التحميل" : filteredStudents.length > 0 ? "اختر الطالب" : "لا يوجد طلاب") : "اختر الحلقة أولاً"} />
-                    </SelectTrigger>
-                    <SelectContent dir="rtl">
-                      {selectedCircle ? filteredStudents.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>{student.name}</SelectItem>
-                      )) : null}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1007,7 +998,6 @@ export default function AdminExamsPage() {
                           <TableHead className="text-right font-black text-[#475569]">الطالب</TableHead>
                           <TableHead className="text-right font-black text-[#475569]">{portionUnitLabel}</TableHead>
                           <TableHead className="text-right font-black text-[#475569]">التاريخ</TableHead>
-                          <TableHead className="text-right font-black text-[#475569]">الحالة</TableHead>
                           <TableHead className="text-right font-black text-[#475569]">الإجراء</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1015,10 +1005,31 @@ export default function AdminExamsPage() {
                         {studentScheduleRows.map((row) => {
                           const isSending = sendingScheduleStudentId === row.student.id
                           const isScheduled = Boolean(row.activeSchedule)
+                          const isSelectedForExam = form.studentId === row.student.id
+                          const cannotSend = !isScheduled && (!row.draftPortionNumber || !row.draftExamDate)
+                          const actionLabel = isScheduled
+                            ? "تم الإرسال"
+                            : isSending
+                              ? ""
+                              : cannotSend
+                                ? "لا يوجد محفوظ, فقط"
+                                : "إرسال"
 
                           return (
                             <TableRow key={`schedule-row-${row.student.id}`}>
-                              <TableCell className="text-right font-bold text-[#1f2937]">{row.student.name}</TableCell>
+                              <TableCell className="text-right font-bold text-[#1f2937]">
+                                <div className="flex flex-col items-end gap-2">
+                                  <div>{row.student.name}</div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => selectStudentForExam(row.student.id)}
+                                    className="h-8 rounded-xl border-[#d7e3f2] px-3 text-xs font-black text-[#3453a7] hover:bg-[#f8fbff]"
+                                  >
+                                    {isSelectedForExam ? "الطالب الحالي" : "اختيار للاختبار"}
+                                  </Button>
+                                </div>
+                              </TableCell>
                               <TableCell className="text-right">
                                 {isScheduled ? (
                                   <div className="text-sm font-black text-[#1f2937]">{row.activeSchedule?.exam_portion_label || "-"}</div>
@@ -1034,7 +1045,7 @@ export default function AdminExamsPage() {
                                     </SelectContent>
                                   </Select>
                                 ) : (
-                                  <div className="text-sm font-bold text-[#64748b]">لا يوجد {portionUnitLabel} متاح</div>
+                                  <div className="text-sm font-bold text-[#64748b]">لا يوجد محفوظ, فقط</div>
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
@@ -1047,22 +1058,13 @@ export default function AdminExamsPage() {
                                 />
                               </TableCell>
                               <TableCell className="text-right">
-                                {isScheduled ? (
-                                  <Badge className="border-0 bg-[#ecfdf5] px-3 py-1 text-xs font-black text-[#166534]">تم الإرسال</Badge>
-                                ) : row.hasEligiblePortions ? (
-                                  <Badge className="border-0 bg-[#eff6ff] px-3 py-1 text-xs font-black text-[#3453a7]">جاهز للإرسال</Badge>
-                                ) : (
-                                  <Badge className="border-0 bg-[#f8fafc] px-3 py-1 text-xs font-black text-[#64748b]">لا يوجد محفوظ مؤهل</Badge>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right">
                                 <Button
                                   type="button"
                                   onClick={() => handleSendScheduleNotification(row.student.id)}
-                                  disabled={isScheduled || isSending || !row.draftPortionNumber || !row.draftExamDate}
-                                  className="h-11 rounded-2xl bg-[#3453a7] px-5 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#e2e8f0] disabled:text-[#64748b]"
+                                  disabled={isScheduled || isSending || cannotSend}
+                                  className="h-11 w-[132px] rounded-2xl bg-[#3453a7] px-5 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7]/55 disabled:text-white disabled:opacity-100"
                                 >
-                                  {isScheduled ? "تم الإرسال" : isSending ? "جاري الإرسال..." : "إرسال"}
+                                  {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : actionLabel}
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -1076,12 +1078,6 @@ export default function AdminExamsPage() {
                     لا يوجد طلاب في الحلقة المختارة.
                   </div>
                 )}
-              </div>
-            ) : null}
-
-            {!form.studentId ? (
-              <div className="mt-2 rounded-[24px] border border-dashed border-[#d7e3f2] bg-white px-5 py-6 text-center text-sm font-black text-[#64748b]">
-                اختر الطالب أولاً لعرض اختبار الطالب والمواعيد والسجل.
               </div>
             ) : null}
           </div>
@@ -1100,6 +1096,11 @@ export default function AdminExamsPage() {
                   <ClipboardCheck className="h-6 w-6 text-[#3453a7]" />
                   اختبار الطالب
                 </CardTitle>
+                {selectedStudent ? (
+                  <CardDescription className="text-right text-sm font-bold text-[#64748b]">
+                    الطالب المحدد حالياً: {selectedStudent.name}
+                  </CardDescription>
+                ) : null}
               </CardHeader>
 
               <CardContent>

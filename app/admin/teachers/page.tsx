@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Trash2, ArrowRight, Settings, Users, User, Edit2, Upload } from 'lucide-react'
@@ -192,6 +191,7 @@ export default function TeacherManagement() {
   const [newTeacherAccountNumber, setNewTeacherAccountNumber] = useState("")
   const [selectedHalaqah, setSelectedHalaqah] = useState("")
   const [newTeacherRole, setNewTeacherRole] = useState<"teacher" | "deputy_teacher">("teacher")
+  const [isAddOptionsDialogOpen, setIsAddOptionsDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false)
   const [isSavingAdd, setIsSavingAdd] = useState(false)
@@ -538,14 +538,58 @@ export default function TeacherManagement() {
               <h1 className="text-2xl font-bold text-[#1a2332]">إدارة المعلمين</h1>
             </div>
 
+            <button
+              type="button"
+              onClick={() => setIsAddOptionsDialogOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#3453a7]/50 bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              إضافة
+            </button>
+
+            <Dialog open={isAddOptionsDialogOpen} onOpenChange={setIsAddOptionsDialogOpen}>
+              <DialogContent className="sm:max-w-[420px]">
+                <DialogHeader>
+                  <DialogTitle className="text-xl text-[#1a2332]">اختر نوع الإضافة</DialogTitle>
+                  <DialogDescription className="text-right text-sm leading-7 text-neutral-500">
+                    اختر بين إضافة معلم واحد أو إضافة جماعية من خلال الإدخال اليدوي أو ملف إكسل.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddOptionsDialogOpen(false)
+                      setIsAddDialogOpen(true)
+                    }}
+                    className="flex items-center justify-between rounded-2xl border border-[#3453a7]/20 bg-[#f8fbff] px-4 py-4 text-right transition-colors hover:bg-[#eef4ff]"
+                  >
+                    <Plus className="h-5 w-5 text-[#3453a7]" />
+                    <div className="space-y-1">
+                      <div className="text-sm font-bold text-[#1a2332]">إضافة معلم</div>
+                      <div className="text-xs text-neutral-500">إضافة سجل واحد بشكل يدوي.</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddOptionsDialogOpen(false)
+                      setIsBulkDialogOpen(true)
+                    }}
+                    className="flex items-center justify-between rounded-2xl border border-[#3453a7]/20 bg-white px-4 py-4 text-right transition-colors hover:bg-[#f8fbff]"
+                  >
+                    <Upload className="h-5 w-5 text-[#3453a7]" />
+                    <div className="space-y-1">
+                      <div className="text-sm font-bold text-[#1a2332]">إضافة جماعية</div>
+                      <div className="text-xs text-neutral-500">رفع إكسل أو إدخال عدة معلمين دفعة واحدة.</div>
+                    </div>
+                  </button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             {/* Add Teacher Dialog */}
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#3453a7]/50 bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors">
-                  <Plus className="w-4 h-4" />
-                  إضافة
-                </button>
-              </DialogTrigger>
               <DialogContent className="sm:max-w-[480px]">
                 <DialogHeader>
                   <DialogTitle className="text-xl text-[#1a2332]">إضافة معلم جديد</DialogTitle>
@@ -593,12 +637,6 @@ export default function TeacherManagement() {
             </Dialog>
 
             <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
-              <DialogTrigger asChild>
-                <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#3453a7]/50 bg-white hover:bg-[#3453a7]/10 text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors">
-                  <Upload className="w-4 h-4" />
-                  إضافة جماعية
-                </button>
-              </DialogTrigger>
               <DialogContent className="sm:max-w-[1100px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="text-xl text-[#1a2332]">إضافة جماعية للمعلمين</DialogTitle>
