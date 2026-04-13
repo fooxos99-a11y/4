@@ -344,7 +344,7 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
                     onClick={handleDisconnect}
                     disabled={isDisconnecting}
                     variant="outline"
-                    className="h-10 rounded-2xl border-rose-200 bg-rose-50 px-3 text-sm font-black text-rose-700 hover:bg-rose-100"
+                    className="h-10 rounded-2xl border-rose-200 bg-rose-50 px-3 text-sm font-black text-rose-700 hover:bg-rose-100 hover:text-rose-700"
                   >
                     <LogOut className="me-1.5 h-4 w-4" />
                     {isDisconnecting ? "جاري الإلغاء..." : "إلغاء الربط"}

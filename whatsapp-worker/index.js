@@ -222,6 +222,40 @@ function extractIncomingMessageText(message) {
   return `[${String(message.type || "رسالة")}] ${String(message.body || "").trim()}`.trim()
 }
 
+async function extractIncomingMediaPayload(message) {
+  if (!message || (message.type !== "audio" && message.type !== "ptt")) {
+    return {
+      replyType: String(message?.type || "text"),
+      mediaMimeType: null,
+      mediaBase64: null,
+    }
+  }
+
+  try {
+    if (typeof message.downloadMedia !== "function") {
+      return {
+        replyType: String(message.type || "audio"),
+        mediaMimeType: null,
+        mediaBase64: null,
+      }
+    }
+
+    const downloadedMedia = await message.downloadMedia()
+    return {
+      replyType: String(message.type || "audio"),
+      mediaMimeType: downloadedMedia?.mimetype || "audio/ogg; codecs=opus",
+      mediaBase64: downloadedMedia?.data || null,
+    }
+  } catch (error) {
+    log(`Failed to download incoming WhatsApp media for message ${extractWhatsAppMessageId(message) || "unknown"}.`, error)
+    return {
+      replyType: String(message?.type || "audio"),
+      mediaMimeType: null,
+      mediaBase64: null,
+    }
+  }
+}
+
 async function updateSentMessageMetadata(id, whatsappMessageId) {
   if (!whatsappMessageId) {
     return
@@ -341,6 +375,7 @@ async function saveIncomingReply(message) {
 
   const messageId = extractWhatsAppMessageId(message)
   const messageText = extractIncomingMessageText(message)
+  const mediaPayload = await extractIncomingMediaPayload(message)
 
   if (!messageId || !messageText) {
     log("Incoming WhatsApp message skipped because it has no usable id or text.", {
@@ -392,11 +427,34 @@ async function saveIncomingReply(message) {
     timestamp: typeof message.timestamp === "number" ? message.timestamp : null,
     is_read: false,
     original_message_id: originalMessageRecord.id,
+    reply_type: mediaPayload.replyType,
+    media_mime_type: mediaPayload.mediaMimeType,
+    media_base64: mediaPayload.mediaBase64,
   }
 
   const { error } = await supabase.from("whatsapp_replies").insert(payload)
 
   if (error) {
+    if (error.code === "PGRST204" || error.code === "42703") {
+      const fallbackPayload = {
+        from_phone: payload.from_phone,
+        message_text: payload.message_text,
+        message_id: payload.message_id,
+        timestamp: payload.timestamp,
+        is_read: payload.is_read,
+        original_message_id: payload.original_message_id,
+      }
+
+      const { error: fallbackError } = await supabase.from("whatsapp_replies").insert(fallbackPayload)
+
+      if (!fallbackError || fallbackError.code === "23505") {
+        return
+      }
+
+      log(`Failed to save incoming WhatsApp reply ${messageId} using fallback payload.`, fallbackError)
+      return
+    }
+
     if (error.code === "23505") {
       log(`Incoming WhatsApp reply ${messageId} already saved. Skipping duplicate.`)
       return

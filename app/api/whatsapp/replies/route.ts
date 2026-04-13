@@ -7,6 +7,9 @@ type WhatsAppReplyRow = {
   id: string
   from_phone: string
   message_text: string
+  reply_type?: string | null
+  media_mime_type?: string | null
+  media_base64?: string | null
   timestamp: number | null
   received_at: string | null
   is_read: boolean
@@ -116,17 +119,27 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient()
 
-    let query = supabase
-      .from("whatsapp_replies")
-      .select("id, from_phone, message_text, timestamp, received_at, is_read, original_message_id")
-      .order("received_at", { ascending: false })
-      .limit(Math.max(limit * 10, 300))
+    const buildRepliesQuery = (selectClause: string) => {
+      let query = supabase
+        .from("whatsapp_replies")
+        .select(selectClause)
+        .order("received_at", { ascending: false })
+        .limit(Math.max(limit * 10, 300))
 
-    if (unreadOnly) {
-      query = query.eq("is_read", false)
+      if (unreadOnly) {
+        query = query.eq("is_read", false)
+      }
+
+      return query
     }
 
-    const { data: replies, error } = await query
+    let { data: replies, error } = await buildRepliesQuery("id, from_phone, message_text, reply_type, media_mime_type, media_base64, timestamp, received_at, is_read, original_message_id")
+
+    if (error && (error.code === "42703" || error.code === "PGRST204")) {
+      const legacyResult = await buildRepliesQuery("id, from_phone, message_text, timestamp, received_at, is_read, original_message_id")
+      replies = legacyResult.data
+      error = legacyResult.error
+    }
 
     if (error) {
       console.error("[WhatsApp] Error fetching replies:", error)
@@ -224,6 +237,9 @@ export async function GET(request: Request) {
           student_name: student?.name || "غير معروف",
           sent_message_text: originalMessage.message_text,
           reply_message_text: reply.message_text,
+          reply_type: reply.reply_type || "text",
+          media_mime_type: reply.media_mime_type || null,
+          media_base64: reply.media_base64 || null,
           reply_at: replyDate?.toISOString() || reply.received_at || null,
           is_read: reply.is_read,
         }

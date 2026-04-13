@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { MessageCircle, Search, CheckCheck, Send, Trash2 } from "lucide-react"
+import { MessageCircle, Search, CheckCheck, Send, Trash2, Mic } from "lucide-react"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { SiteLoader } from "@/components/ui/site-loader"
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog"
@@ -18,7 +18,18 @@ interface Reply {
   student_name: string
   sent_message_text: string
   reply_message_text: string
+  reply_type?: string | null
+  media_mime_type?: string | null
+  media_base64?: string | null
   is_read: boolean
+}
+
+function buildReplyAudioSrc(reply: Reply) {
+  if (!reply.media_base64 || !reply.media_mime_type) {
+    return null
+  }
+
+  return `data:${reply.media_mime_type};base64,${reply.media_base64}`
 }
 
 export default function WhatsAppRepliesPage() {
@@ -58,8 +69,8 @@ export default function WhatsAppRepliesPage() {
       }
 
       return (
-        reply.reply_message_text.toLowerCase().includes(normalizedSearchTerm) ||
-        reply.sent_message_text.toLowerCase().includes(normalizedSearchTerm) ||
+        (reply.reply_message_text || "").toLowerCase().includes(normalizedSearchTerm) ||
+        (reply.sent_message_text || "").toLowerCase().includes(normalizedSearchTerm) ||
         reply.student_name.toLowerCase().includes(normalizedSearchTerm)
       )
     })
@@ -218,6 +229,10 @@ export default function WhatsAppRepliesPage() {
                   </div>
                 ) : (
                   filteredReplies.map((reply) => (
+                    (() => {
+                      const replyAudioSrc = buildReplyAudioSrc(reply)
+
+                      return (
                     <div
                       key={reply.id}
                       className={`rounded-2xl border p-4 md:p-5 ${reply.is_read ? "border-slate-200 bg-white" : "border-[#cddcf6] bg-[#f7fbff]"}`}
@@ -268,13 +283,25 @@ export default function WhatsAppRepliesPage() {
 
                         <div className="rounded-xl border border-[#3453a7]/20 bg-[#3453a7]/5 p-4">
                           <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#3453a7]">
-                            <MessageCircle className="h-4 w-4" />
+                            {reply.reply_type === "audio" || reply.reply_type === "ptt" ? <Mic className="h-4 w-4" /> : <MessageCircle className="h-4 w-4" />}
                             أول رد من ولي الأمر
                           </div>
-                          <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.reply_message_text}</p>
+                          {replyAudioSrc ? (
+                            <div className="space-y-3">
+                              <audio controls preload="none" className="w-full">
+                                <source src={replyAudioSrc} type={reply.media_mime_type || "audio/ogg"} />
+                                المتصفح الحالي لا يدعم تشغيل الصوت.
+                              </audio>
+                              <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.reply_message_text}</p>
+                            </div>
+                          ) : (
+                            <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.reply_message_text}</p>
+                          )}
                         </div>
                       </div>
                     </div>
+                      )
+                    })()
                   ))
                 )}
               </CardContent>
