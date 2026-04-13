@@ -6,7 +6,7 @@ import { isWhatsAppWorkerReady, readWhatsAppWorkerStatus } from "@/lib/whatsapp-
 import { NextResponse } from "next/server"
 
 const OUTBOUND_WHATSAPP_MEDIA_MIGRATION = "scripts/057_add_whatsapp_outbound_media_columns.sql"
-const MAX_OUTBOUND_MEDIA_SIZE_BYTES = 3 * 1024 * 1024
+const MAX_OUTBOUND_MEDIA_SIZE_BYTES = 50 * 1024 * 1024
 const ALLOWED_OUTBOUND_MEDIA_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 
 type OutgoingMediaInput = {
@@ -171,7 +171,7 @@ function normalizeOutgoingMedia(input: OutgoingMediaInput | null | undefined) {
   }
 
   if (mediaSizeBytes > MAX_OUTBOUND_MEDIA_SIZE_BYTES) {
-    throw new Error("حجم الصورة كبير جدًا. الحد الأقصى 3 ميجابايت.")
+    throw new Error("حجم الصورة كبير جدًا. اختر صورة أصغر ثم أعد المحاولة.")
   }
 
   return {

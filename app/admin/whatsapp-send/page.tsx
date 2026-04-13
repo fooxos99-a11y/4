@@ -33,7 +33,7 @@ type OutgoingImagePayload = {
   previewUrl: string
 }
 
-const OUTBOUND_IMAGE_MAX_SIZE_BYTES = 3 * 1024 * 1024
+const OUTBOUND_IMAGE_MAX_SIZE_BYTES = 50 * 1024 * 1024
 const OUTBOUND_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
 
 const TEMPLATE_VARIABLES = [
@@ -178,7 +178,7 @@ export default function WhatsAppSendPage() {
     if (file.size > OUTBOUND_IMAGE_MAX_SIZE_BYTES) {
       toast({
         title: "الصورة كبيرة جدًا",
-        description: "الحد الأقصى لحجم الصورة هو 3 ميجابايت.",
+        description: "الرجاء اختيار صورة أصغر ثم إعادة المحاولة.",
         variant: "destructive",
       })
       event.target.value = ""
@@ -529,7 +529,6 @@ export default function WhatsAppSendPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <Label htmlFor="whatsapp-image" className="text-sm font-semibold text-[#1a2332]">إرفاق صورة</Label>
-                          <p className="mt-1 text-xs text-gray-500">الأنواع المدعومة: JPG و PNG و WEBP. الحد الأقصى 3 ميجابايت.</p>
                         </div>
                         {imagePayload ? (
                           <Button
@@ -550,8 +549,22 @@ export default function WhatsAppSendPage() {
                         type="file"
                         accept={OUTBOUND_IMAGE_MIME_TYPES.join(",")}
                         onChange={handleImageSelection}
-                        className="block w-full cursor-pointer rounded-xl border border-[#3453a7]/15 bg-white px-3 py-2 text-sm text-[#1a2332] file:me-3 file:rounded-lg file:border-0 file:bg-[#3453a7] file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-[#274187]"
+                        className="hidden"
                       />
+
+                      <div className="flex items-center gap-3 rounded-xl border border-[#3453a7]/15 bg-white px-3 py-3">
+                        <div className="min-w-0 flex-1 text-sm text-[#1a2332]">
+                          <span className="block truncate">{imagePayload?.fileName || "لا يوجد ملف محدد"}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-sm h-9 rounded-lg border-[#3453a7]/50 text-neutral-700 whitespace-nowrap"
+                        >
+                          رفع
+                        </Button>
+                      </div>
 
                       {imagePayload ? (
                         <div className="overflow-hidden rounded-2xl border border-[#3453a7]/15 bg-white">
@@ -563,7 +576,6 @@ export default function WhatsAppSendPage() {
                           <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                             <div>
                               <p className="font-semibold text-[#1a2332]">{imagePayload.fileName}</p>
-                              <p className="text-xs text-gray-500">سيتم إرسال الصورة إلى أولياء الأمور المحددين.</p>
                             </div>
                             <div className="rounded-full bg-[#3453a7]/10 p-2 text-[#3453a7]">
                               <ImagePlus className="h-4 w-4" />
