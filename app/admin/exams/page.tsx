@@ -512,21 +512,18 @@ export default function AdminExamsPage() {
       const studentPassedPortions = getPassedPortionNumbers(studentExamsList, portionMode)
       const eligibleStudentPortions = getEligibleExamPortions(student, studentPlanProgress, portionMode)
       const studentSchedules = [...(activeSchedulesByStudentId.get(student.id) || [])].sort((left, right) => left.exam_date.localeCompare(right.exam_date) || left.created_at.localeCompare(right.created_at))
-      const activeSchedule = studentSchedules[0] || null
       const scheduledPortionNumbers = new Set(studentSchedules.map((schedule) => Number(schedule.portion_number || schedule.juz_number)))
       const availableStudentPortions = eligibleStudentPortions.filter((portion) => !studentPassedPortions.has(portion.portionNumber) && !scheduledPortionNumbers.has(portion.portionNumber))
       const draft = scheduleDrafts[student.id]
-      const draftPortionNumber = activeSchedule
-        ? String(activeSchedule.portion_number || activeSchedule.juz_number)
-        : draft?.juzNumber && availableStudentPortions.some((portion) => String(portion.portionNumber) === draft.juzNumber)
+      const draftPortionNumber = draft?.juzNumber && availableStudentPortions.some((portion) => String(portion.portionNumber) === draft.juzNumber)
           ? draft.juzNumber
           : (availableStudentPortions[0] ? String(availableStudentPortions[0].portionNumber) : "")
-      const draftExamDate = activeSchedule?.exam_date || draft?.examDate || getTodayDate()
-      const draftPortionLabel = activeSchedule?.exam_portion_label || availableStudentPortions.find((portion) => String(portion.portionNumber) === draftPortionNumber)?.label || ""
+      const draftExamDate = draft?.examDate || getTodayDate()
+      const draftPortionLabel = availableStudentPortions.find((portion) => String(portion.portionNumber) === draftPortionNumber)?.label || ""
 
       return {
         student,
-        activeSchedule,
+        scheduledCount: studentSchedules.length,
         availablePortions: availableStudentPortions,
         draftPortionNumber,
         draftExamDate,
@@ -887,10 +884,6 @@ export default function AdminExamsPage() {
       return
     }
 
-    if (targetStudent.activeSchedule) {
-      return
-    }
-
     if (!targetStudent.draftPortionNumber) {
       await showAlert(`اختر ${portionUnitLabel} المراد جدولة اختباره`, "تنبيه")
       return
@@ -977,7 +970,7 @@ export default function AdminExamsPage() {
       <Header />
       <main className="px-4 py-8 md:px-6 md:py-10">
         <div className="mx-auto max-w-7xl space-y-6">
-          {!isWhatsAppReady ? (
+          {!isWhatsAppStatusLoading && !isWhatsAppReady ? (
             <div className="text-right text-sm font-black leading-7 text-[#b91c1c]">
               واتس اب غير مربوط حاليا، إربطه بالباركود لتتمكن من الإرسال الى اولياء الأمور.
             </div>
@@ -1048,23 +1041,21 @@ export default function AdminExamsPage() {
                       <TableBody>
                         {studentScheduleRows.map((row) => {
                           const isSending = sendingScheduleStudentId === row.student.id
-                          const isScheduled = Boolean(row.activeSchedule)
-                          const cannotSend = !isScheduled && (!row.draftPortionNumber || !row.draftExamDate)
-                          const actionLabel = isScheduled
-                            ? "تم الإرسال"
-                            : isSending
-                              ? ""
-                              : cannotSend
-                                ? "لا يوجد محفوظ, فقط"
-                                : "إرسال"
+                          const hasAvailablePortions = row.availablePortions.length > 0
+                          const cannotSend = !row.draftPortionNumber || !row.draftExamDate
+                          const actionLabel = isSending
+                            ? ""
+                            : hasAvailablePortions
+                              ? "إرسال"
+                              : row.scheduledCount > 0
+                                ? "اكتملت الجدولة"
+                                : "لا يوجد محفوظ, فقط"
 
                           return (
                             <TableRow key={`schedule-row-${row.student.id}`}>
                               <TableCell className="text-right font-bold text-[#1f2937]">{row.student.name}</TableCell>
                               <TableCell className="text-right">
-                                {isScheduled ? (
-                                  <div className="text-sm font-black text-[#1f2937]">{row.activeSchedule?.exam_portion_label || "-"}</div>
-                                ) : row.availablePortions.length > 0 ? (
+                                {hasAvailablePortions ? (
                                   <Select value={row.draftPortionNumber || undefined} onValueChange={(value) => updateScheduleDraft(row.student.id, { juzNumber: value })} dir="rtl">
                                     <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-right">
                                       <SelectValue placeholder={`اختر ${portionUnitLabel}`} />
@@ -1075,6 +1066,8 @@ export default function AdminExamsPage() {
                                       ))}
                                     </SelectContent>
                                   </Select>
+                                ) : row.scheduledCount > 0 ? (
+                                  <div className="text-sm font-bold text-[#64748b]">تمت جدولة كل {portionUnitLabel === "الحزب" ? "الأحزاب" : "الأجزاء"} المتاحة</div>
                                 ) : (
                                   <div className="text-sm font-bold text-[#64748b]">لا يوجد محفوظ, فقط</div>
                                 )}
@@ -1084,7 +1077,6 @@ export default function AdminExamsPage() {
                                   type="date"
                                   value={row.draftExamDate}
                                   onChange={(event) => updateScheduleDraft(row.student.id, { examDate: event.target.value })}
-                                  disabled={isScheduled}
                                   className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold disabled:cursor-not-allowed disabled:opacity-70"
                                 />
                               </TableCell>
@@ -1092,7 +1084,7 @@ export default function AdminExamsPage() {
                                 <Button
                                   type="button"
                                   onClick={() => handleSendScheduleNotification(row.student.id)}
-                                  disabled={isScheduled || isSending || cannotSend}
+                                  disabled={!hasAvailablePortions || isSending || cannotSend}
                                   className="h-11 w-[132px] rounded-2xl bg-[#3453a7] px-5 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7]/55 disabled:text-white disabled:opacity-100"
                                 >
                                   {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : actionLabel}
@@ -1294,7 +1286,7 @@ export default function AdminExamsPage() {
           </Dialog>
 
           <Dialog open={isTemplatesDialogOpen} onOpenChange={setIsTemplatesDialogOpen}>
-            <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-4xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
+            <DialogContent onOpenAutoFocus={(event) => event.preventDefault()} className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-4xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
               <div className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] bg-white sm:max-h-[90vh]">
                 <DialogHeader className="border-b border-[#e5edf6] px-6 py-5">
                   <DialogTitle className="flex w-full items-center justify-start gap-2 text-left text-2xl font-black text-[#1a2332]">
@@ -1417,7 +1409,7 @@ export default function AdminExamsPage() {
                               </div>
 
                               <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
-                                <Button type="button" variant="outline" onClick={() => handleCancelSchedule(schedule.id, schedule.student_id)} disabled={isCancellingScheduleId === schedule.id} className="h-9 min-w-[96px] flex-1 rounded-xl border-[#fee2e2] bg-white px-3 text-xs font-black text-[#b91c1c] hover:bg-[#fff7f7] disabled:opacity-60 sm:flex-none">
+                                <Button type="button" variant="outline" onClick={() => handleCancelSchedule(schedule.id, schedule.student_id)} disabled={isCancellingScheduleId === schedule.id} className="h-9 min-w-[96px] flex-1 rounded-xl border-[#fee2e2] bg-white px-3 text-xs font-black text-[#b91c1c] hover:bg-[#fff7f7] hover:text-[#b91c1c] disabled:opacity-60 sm:flex-none">
                                   <Trash2 className="me-1.5 h-3.5 w-3.5" />
                                   {isCancellingScheduleId === schedule.id ? "جاري الإلغاء..." : "إلغاء"}
                                 </Button>

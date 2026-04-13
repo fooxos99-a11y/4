@@ -196,6 +196,10 @@ export default function WhatsAppSendPage() {
   }
 
   const handleSendMessages = async () => {
+    if (isWhatsAppStatusLoading) {
+      return
+    }
+
     if (!isWhatsAppReady) {
       toast({
         title: "واتساب غير مربوط",
@@ -324,7 +328,7 @@ export default function WhatsAppSendPage() {
               </Button>
             </div>
 
-            {!isWhatsAppReady ? (
+            {!isWhatsAppStatusLoading && !isWhatsAppReady ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
                 واتساب غير مربوط حالياً. اربط الحساب أولاً من نافذة باركود الواتساب قبل إرسال الرسائل إلى أولياء الأمور.
               </div>

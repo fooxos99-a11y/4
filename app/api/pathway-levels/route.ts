@@ -21,21 +21,33 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const levelNumber = Number(body?.level_number)
     const halaqah = String(body?.halaqah || "").trim()
     const title = String(body?.title || "").trim()
     const description = String(body?.description || "").trim() || null
     const points = Number(body?.points)
 
-    if (!halaqah || !Number.isInteger(levelNumber) || levelNumber <= 0 || !title) {
+    if (!halaqah || !title) {
       return NextResponse.json({ error: "بيانات المستوى غير مكتملة" }, { status: 400 })
     }
 
     const supabase = createAdminClient()
+    const { data: latestLevel, error: latestLevelError } = await supabase
+      .from("pathway_levels")
+      .select("level_number")
+      .eq("halaqah", halaqah)
+      .order("level_number", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (latestLevelError) {
+      throw latestLevelError
+    }
+
+    const nextLevelNumber = Number(latestLevel?.level_number || 0) + 1
     const { data: level, error: levelError } = await supabase
       .from("pathway_levels")
       .insert({
-        level_number: levelNumber,
+        level_number: nextLevelNumber,
         halaqah,
         title,
         description,
@@ -50,7 +62,7 @@ export async function POST(request: Request) {
       throw levelError
     }
 
-    return NextResponse.json({ success: true, level })
+    return NextResponse.json({ success: true, level, levelNumber: nextLevelNumber })
   } catch (error) {
     console.error("[pathway-levels] POST:", error)
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })

@@ -838,7 +838,7 @@ export default function AdminRecitationDayPage() {
     <div className="min-h-screen bg-[#f8fbff]" dir="rtl">
       <Header />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 lg:px-6">
-        {!isWhatsAppReady ? (
+        {!isWhatsAppStatusLoading && !isWhatsAppReady ? (
           <div className="text-right text-sm font-black leading-7 text-[#b91c1c]">
             واتس اب غير مربوط حاليا، إربطه بالباركود لتتمكن من الإرسال الى اولياء الأمور.
           </div>

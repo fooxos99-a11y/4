@@ -88,7 +88,7 @@ function getSupabase() {
 
 export default function AdminPathwaysPage() {
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("إدارة المسار");
-  const { isReady: isWhatsAppReady } = useWhatsAppStatus()
+  const { isReady: isWhatsAppReady, isLoading: isWhatsAppStatusLoading } = useWhatsAppStatus()
 
     // نافذة تعديل النقاط
     const [showPointsModal, setShowPointsModal] = useState(false);
@@ -109,7 +109,6 @@ export default function AdminPathwaysPage() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [showNotificationTemplateModal, setShowNotificationTemplateModal] = useState(false)
   const [isSavingNotificationTemplate, setIsSavingNotificationTemplate] = useState(false)
-  const [isPublishingLevel, setIsPublishingLevel] = useState(false)
   const [notificationTemplates, setNotificationTemplates] = useState<PathwayLevelNotificationTemplates>(DEFAULT_PATHWAY_LEVEL_NOTIFICATION_TEMPLATES)
 
   const [notification, setNotification] = useState<string>("")
@@ -294,7 +293,7 @@ export default function AdminPathwaysPage() {
 
     if (!finalUrl) return
 
-    await fetch("/api/pathway-contents", {
+    const response = await fetch("/api/pathway-contents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -307,13 +306,19 @@ export default function AdminPathwaysPage() {
       }),
     })
 
+    if (!response.ok) {
+      showNotification("حدث خطأ أثناء إضافة المحتوى")
+      return
+    }
+
     setShowContentForm(false)
     setContentTitle("")
     setContentDescription("")
     setContentUrl("")
     setSelectedFile(null)
     setUploadMode("url")
-    loadContents()
+    await loadContents()
+    await notifyLevelUpdated("تمت إضافة المحتوى")
   }
 
   async function handleDeleteContent(id: string) {
@@ -325,17 +330,23 @@ export default function AdminPathwaysPage() {
     if (!quizQuestion || quizOptions.some((o) => !o)) return
 
     const supabase = getSupabase()
-    await supabase.from("pathway_level_questions").insert({
+    const { error } = await supabase.from("pathway_level_questions").insert({
       level_number: selectedLevel, halaqah: selectedHalaqah, question: quizQuestion,
       options: quizOptions,
       correct_answer: correctAnswer,
     })
 
+    if (error) {
+      showNotification("حدث خطأ أثناء إضافة السؤال")
+      return
+    }
+
     setQuizQuestion("")
     setQuizOptions(["", "", "", ""])
     setCorrectAnswer(0)
     setShowQuizForm(false)
-    loadQuizzes()
+    await loadQuizzes()
+    await notifyLevelUpdated("تمت إضافة السؤال")
   }
 
   async function handleDeleteQuiz(id: number) {
@@ -345,14 +356,12 @@ export default function AdminPathwaysPage() {
   }
 
   async function handleAddLevel() {
-    const nextNumber = (levels[levels.length - 1]?.level_number || 0) + 1;
     const response = await fetch("/api/pathway-levels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        level_number: nextNumber,
         halaqah: selectedHalaqah,
-        title: `المستوى ${nextNumber}`,
+        title: "مستوى جديد",
         description: "",
         points: 100,
       }),
@@ -361,9 +370,45 @@ export default function AdminPathwaysPage() {
 
     if (response.ok && data?.success) {
       showNotification('تمت إضافة مستوى جديد بنجاح');
-      loadLevels();
+      await loadLevels();
+      if (Number.isInteger(Number(data?.level?.level_number))) {
+        setSelectedLevel(Number(data.level.level_number))
+      }
     } else {
       showNotification(data?.error || 'حدث خطأ أثناء إضافة المستوى');
+    }
+  }
+
+  async function notifyLevelUpdated(prefixMessage: string) {
+    if (!selectedHalaqah || !selectedLevel) {
+      showNotification(prefixMessage)
+      return
+    }
+
+    try {
+      const response = await fetch("/api/pathway-level-notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          halaqah: selectedHalaqah,
+          level_number: selectedLevel,
+        }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        const errorMessage = String(data?.error || "")
+        if (response.status === 400 && errorMessage.includes("لن يتم إرسال التنبيه")) {
+          showNotification(prefixMessage)
+          return
+        }
+
+        throw new Error(errorMessage || "تعذر إرسال تنبيه المسار")
+      }
+
+      showNotification(data?.sent > 0 ? `${prefixMessage} وتم إشعار الطلاب تلقائيًا` : prefixMessage)
+    } catch (error) {
+      showNotification(error instanceof Error ? `${prefixMessage}، لكن ${error.message}` : prefixMessage)
     }
   }
 
@@ -392,36 +437,6 @@ export default function AdminPathwaysPage() {
       showNotification(error instanceof Error ? error.message : "تعذر حفظ قالب التنبيه")
     } finally {
       setIsSavingNotificationTemplate(false)
-    }
-  }
-
-  async function handlePublishLevelNotification() {
-    if (!selectedHalaqah || !selectedLevel) {
-      showNotification("اختر الحلقة والمستوى أولاً")
-      return
-    }
-
-    try {
-      setIsPublishingLevel(true)
-      const response = await fetch("/api/pathway-level-notifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          halaqah: selectedHalaqah,
-          level_number: selectedLevel,
-        }),
-      })
-      const data = await response.json().catch(() => null)
-
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.error || "تعذر إرسال تنبيه المسار")
-      }
-
-      showNotification(data.sent > 0 ? "تم حفظ المسار وإرسال التنبيه للطلاب" : "تم حفظ المسار ولكن لا يوجد طلاب لإشعارهم")
-    } catch (error) {
-      showNotification(error instanceof Error ? error.message : "تعذر إرسال تنبيه المسار")
-    } finally {
-      setIsPublishingLevel(false)
     }
   }
 
@@ -497,7 +512,7 @@ export default function AdminPathwaysPage() {
 
       <main className="flex-1 py-10 px-4">
         <div className="container mx-auto max-w-4xl space-y-8">
-          {!isWhatsAppReady ? (
+          {!isWhatsAppStatusLoading && !isWhatsAppReady ? (
             <div className="text-right text-sm font-black leading-7 text-[#b91c1c]">
               واتس اب غير مربوط حاليا، إربطه بالباركود لتتمكن من الإرسال الى اولياء الأمور.
             </div>
@@ -527,14 +542,14 @@ export default function AdminPathwaysPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowNotificationTemplateModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#3453a7]/50 bg-white hover:bg-[#f8fafc] text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors"
+                className="flex h-11 items-center gap-2 rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white transition-colors hover:bg-[#274187]"
               >
                 <Bell className="w-4 h-4" />
                 قالب التنبيه
               </button>
               <button
                 onClick={() => { loadLevelResults(); setShowResultsModal(true); }}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#3453a7]/50 bg-white hover:bg-[#f8fafc] text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors"
+                className="flex h-11 items-center gap-2 rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white transition-colors hover:bg-[#274187]"
               >
                 نتائج المسار
               </button>
@@ -571,14 +586,6 @@ export default function AdminPathwaysPage() {
                   className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${level?.is_locked ? "border-red-200 text-red-400 hover:bg-red-50" : "border-emerald-200 text-emerald-500 hover:bg-emerald-50"}`}
                 >
                   {level?.is_locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                </button>
-                <button
-                  onClick={handlePublishLevelNotification}
-                  title="حفظ المسار وإشعار الطلاب"
-                  disabled={isPublishingLevel || !level || levelContents.length === 0 || levelQuizzes.length === 0}
-                  className="px-3 h-8 rounded-lg border border-[#3453a7]/50 text-[#4f73d1] hover:bg-[#3453a7]/10 flex items-center justify-center transition-colors text-xs font-semibold disabled:opacity-50 disabled:hover:bg-transparent"
-                >
-                  {isPublishingLevel ? "جاري الإرسال..." : "حفظ وإشعار"}
                 </button>
                 <button
                   onClick={() => { setEditTitle(level?.title || ""); setEditDescription(level?.description || ""); setShowEditModal(true) }}
@@ -765,7 +772,7 @@ export default function AdminPathwaysPage() {
               <h2 className="text-xl font-bold">قالب تنبيه المسار</h2>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-[#1a2332]">قالب إشعار حفظ المسار بعد اكتمال المحتوى والأسئلة</p>
+              <p className="text-sm font-semibold text-[#1a2332]">قالب إشعار تحديث المسار عند إضافة محتوى أو أسئلة جديدة</p>
               <Textarea
                 value={notificationTemplates.publish}
                 onChange={(e) => setNotificationTemplates((current) => ({ ...current, publish: e.target.value }))}
@@ -774,8 +781,8 @@ export default function AdminPathwaysPage() {
               />
             </div>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setShowNotificationTemplateModal(false)} className="px-4 py-2 rounded-lg border border-neutral-200 text-neutral-500 text-sm hover:bg-neutral-50 transition-colors">إلغاء</button>
-              <button onClick={handleSaveNotificationTemplate} disabled={isSavingNotificationTemplate} className="px-4 py-2 rounded-lg border border-[#3453a7]/50 bg-white hover:bg-[#f8fafc] text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors disabled:opacity-50">{isSavingNotificationTemplate ? "جاري الحفظ..." : "حفظ القالب"}</button>
+              <button onClick={() => setShowNotificationTemplateModal(false)} className="h-11 rounded-2xl border border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] transition-colors hover:bg-[#f8fbff]">إلغاء</button>
+              <button onClick={handleSaveNotificationTemplate} disabled={isSavingNotificationTemplate} className="h-11 rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white transition-colors hover:bg-[#274187] disabled:bg-[#3453a7] disabled:opacity-50">{isSavingNotificationTemplate ? "جاري الحفظ..." : "حفظ القالب"}</button>
             </div>
           </div>
         </div>
