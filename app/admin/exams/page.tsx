@@ -270,6 +270,7 @@ export default function AdminExamsPage() {
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [sendingScheduleStudentId, setSendingScheduleStudentId] = useState<string | null>(null)
   const [isCancellingScheduleId, setIsCancellingScheduleId] = useState<string | null>(null)
+  const [isExamDialogOpen, setIsExamDialogOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isTemplatesDialogOpen, setIsTemplatesDialogOpen] = useState(false)
   const [isSchedulesOverviewOpen, setIsSchedulesOverviewOpen] = useState(false)
@@ -508,7 +509,7 @@ export default function AdminExamsPage() {
     setForm((current) => {
       const nextStudentId = filteredStudents.some((student) => student.id === current.studentId)
         ? current.studentId
-        : (filteredStudents[0]?.id || "")
+        : ""
 
       if (nextStudentId === current.studentId) {
         return current
@@ -602,22 +603,6 @@ export default function AdminExamsPage() {
         examDate: nextValues.examDate ?? current[studentId]?.examDate ?? getTodayDate(),
       },
     }))
-  }
-
-  const selectStudentForExam = (studentId: string) => {
-    setForm((current) => {
-      if (current.studentId === studentId) {
-        return current
-      }
-
-      return {
-        ...current,
-        studentId,
-        selectedJuz: "",
-        alertsCount: "0",
-        mistakesCount: "0",
-      }
-    })
   }
 
   const handlePortionModeChange = (value: string) => {
@@ -950,6 +935,11 @@ export default function AdminExamsPage() {
               المواعيد
             </Button>
 
+            <Button type="button" onClick={() => setIsExamDialogOpen(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
+              <ClipboardCheck className="me-2 h-4 w-4" />
+              اختبار الطلاب
+            </Button>
+
             <Button type="button" onClick={() => setIsSettingsOpen(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
               <SlidersHorizontal className="me-2 h-4 w-4" />
               إعدادات الاختبارات
@@ -979,7 +969,7 @@ export default function AdminExamsPage() {
               <div className="mt-6 space-y-4">
                 <div className="flex items-center justify-start gap-2 text-right">
                   <BellRing className="h-5 w-5 text-[#3453a7]" />
-                  <div className="text-lg font-black text-[#1a2332]">جدولة الاختبارات المباشرة</div>
+                  <div className="text-lg font-black text-[#1a2332]">جدولة الاختبارات</div>
                 </div>
 
                 {schedulesTableMissing ? (
@@ -1005,7 +995,6 @@ export default function AdminExamsPage() {
                         {studentScheduleRows.map((row) => {
                           const isSending = sendingScheduleStudentId === row.student.id
                           const isScheduled = Boolean(row.activeSchedule)
-                          const isSelectedForExam = form.studentId === row.student.id
                           const cannotSend = !isScheduled && (!row.draftPortionNumber || !row.draftExamDate)
                           const actionLabel = isScheduled
                             ? "تم الإرسال"
@@ -1017,19 +1006,7 @@ export default function AdminExamsPage() {
 
                           return (
                             <TableRow key={`schedule-row-${row.student.id}`}>
-                              <TableCell className="text-right font-bold text-[#1f2937]">
-                                <div className="flex flex-col items-end gap-2">
-                                  <div>{row.student.name}</div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => selectStudentForExam(row.student.id)}
-                                    className="h-8 rounded-xl border-[#d7e3f2] px-3 text-xs font-black text-[#3453a7] hover:bg-[#f8fbff]"
-                                  >
-                                    {isSelectedForExam ? "الطالب الحالي" : "اختيار للاختبار"}
-                                  </Button>
-                                </div>
-                              </TableCell>
+                              <TableCell className="text-right font-bold text-[#1f2937]">{row.student.name}</TableCell>
                               <TableCell className="text-right">
                                 {isScheduled ? (
                                   <div className="text-sm font-black text-[#1f2937]">{row.activeSchedule?.exam_portion_label || "-"}</div>
@@ -1088,116 +1065,181 @@ export default function AdminExamsPage() {
             </div>
           ) : null}
 
-          {!form.studentId ? null : (
-          <section className="grid gap-6 xl:grid-cols-2">
-            <Card className="rounded-[30px] border-[#dbe5f1] bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)] xl:col-span-2">
-              <CardHeader className="text-right">
-                <CardTitle className="flex items-center justify-start gap-2 text-2xl font-black text-[#1a2332]">
-                  <ClipboardCheck className="h-6 w-6 text-[#3453a7]" />
-                  اختبار الطالب
-                </CardTitle>
-                {selectedStudent ? (
-                  <CardDescription className="text-right text-sm font-bold text-[#64748b]">
-                    الطالب المحدد حالياً: {selectedStudent.name}
-                  </CardDescription>
-                ) : null}
-              </CardHeader>
+          <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
+            <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-5xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:max-h-[90vh] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
+              <div className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] bg-white sm:max-h-[90vh]">
+                <DialogHeader className="border-b border-[#e5edf6] px-4 py-4 sm:px-6 sm:py-5">
+                  <DialogTitle className="flex items-center justify-start gap-2 text-left text-2xl font-black text-[#1a2332]">
+                    <ClipboardCheck className="h-5 w-5 text-[#3453a7]" />
+                    اختبار الطلاب
+                  </DialogTitle>
+                  <DialogDescription className="sr-only">نافذة اختيار الحلقة والطالب ثم تسجيل نتيجة الاختبار.</DialogDescription>
+                </DialogHeader>
 
-              <CardContent>
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(180px,1fr)_minmax(150px,0.75fr)_minmax(150px,0.75fr)_auto] lg:items-end">
-                  <div className="min-w-0 space-y-2 text-right">
-                    <Label className="text-sm font-black text-[#334155]">{portionUnitLabel} المراد اختباره</Label>
-                    <Select key={form.studentId || "no-student"} value={form.selectedJuz || undefined} onValueChange={(value) => setForm((current) => ({ ...current, selectedJuz: value }))} dir="rtl">
-                      <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white">
-                        <SelectValue placeholder={selectedStudent ? `اختر ${portionUnitLabel}` : "اختر الطالب أولاً"} />
-                      </SelectTrigger>
-                      <SelectContent dir="rtl">
-                        {availablePortions.map((portion) => (
-                          <SelectItem key={`${portion.portionType}-${portion.portionNumber}`} value={String(portion.portionNumber)}>{portion.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedStudent && eligiblePortionNumbers.length > 0 && availableJuzs.length === 0 ? (
-                      <div className="text-xs font-bold text-[#20335f]">كل محفوظه تم اختباره فيه.</div>
+                <div className="overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
+                  <div className="space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2 text-right">
+                        <Label className="text-sm font-black text-[#334155]">الحلقة</Label>
+                        <Select
+                          value={selectedCircle}
+                          onValueChange={(value) => {
+                            setSelectedCircle(value)
+                            setForm((current) => ({ ...current, studentId: "", selectedJuz: "", alertsCount: "0", mistakesCount: "0" }))
+                          }}
+                          dir="rtl"
+                        >
+                          <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white">
+                            <SelectValue placeholder="اختر الحلقة" />
+                          </SelectTrigger>
+                          <SelectContent dir="rtl">
+                            {circles.map((circle) => (
+                              <SelectItem key={`exam-dialog-circle-${circle.id}`} value={circle.name}>{circle.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2 text-right">
+                        <Label className="text-sm font-black text-[#334155]">الطالب</Label>
+                        <Select
+                          key={selectedCircle || "no-circle"}
+                          value={form.studentId || undefined}
+                          onValueChange={(value) => setForm((current) => ({ ...current, studentId: value, selectedJuz: "", alertsCount: "0", mistakesCount: "0" }))}
+                          dir="rtl"
+                          disabled={!selectedCircle || isCircleDataLoading || filteredStudents.length === 0}
+                        >
+                          <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white disabled:cursor-not-allowed disabled:opacity-60">
+                            <SelectValue placeholder={selectedCircle ? (isCircleDataLoading ? "جاري تحميل الطلاب" : filteredStudents.length > 0 ? "اختر الطالب" : "لا يوجد طلاب") : "اختر الحلقة أولاً"} />
+                          </SelectTrigger>
+                          <SelectContent dir="rtl">
+                            {filteredStudents.map((student) => (
+                              <SelectItem key={`exam-dialog-student-${student.id}`} value={student.id}>{student.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <Card className="rounded-[30px] border-[#dbe5f1] bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
+                      <CardHeader className="text-right">
+                        <CardTitle className="flex items-center justify-start gap-2 text-2xl font-black text-[#1a2332]">
+                          <ClipboardCheck className="h-6 w-6 text-[#3453a7]" />
+                          اختبار الطالب
+                        </CardTitle>
+                        {selectedStudent ? (
+                          <CardDescription className="text-right text-sm font-bold text-[#64748b]">
+                            الطالب المحدد حالياً: {selectedStudent.name}
+                          </CardDescription>
+                        ) : null}
+                      </CardHeader>
+
+                      <CardContent>
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(180px,1fr)_minmax(150px,0.75fr)_minmax(150px,0.75fr)_auto] lg:items-end">
+                          <div className="min-w-0 space-y-2 text-right">
+                            <Label className="text-sm font-black text-[#334155]">{portionUnitLabel} المراد اختباره</Label>
+                            <Select key={form.studentId || "no-student"} value={form.selectedJuz || undefined} onValueChange={(value) => setForm((current) => ({ ...current, selectedJuz: value }))} dir="rtl" disabled={!selectedStudent}>
+                              <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white">
+                                <SelectValue placeholder={selectedStudent ? `اختر ${portionUnitLabel}` : "اختر الطالب أولاً"} />
+                              </SelectTrigger>
+                              <SelectContent dir="rtl">
+                                {availablePortions.map((portion) => (
+                                  <SelectItem key={`${portion.portionType}-${portion.portionNumber}`} value={String(portion.portionNumber)}>{portion.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {selectedStudent && eligiblePortionNumbers.length > 0 && availableJuzs.length === 0 ? (
+                              <div className="text-xs font-bold text-[#20335f]">كل محفوظه تم اختباره فيه.</div>
+                            ) : null}
+                          </div>
+
+                          <div className="min-w-0 space-y-2 text-right">
+                            <Label className="text-sm font-black text-[#334155]">اسم المختبر</Label>
+                            <Input value={form.testedByName} onChange={(event) => setForm((current) => ({ ...current, testedByName: event.target.value }))} placeholder="اكتب اسم المختبر" className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
+                          </div>
+
+                          <div className="min-w-0 space-y-2 text-right">
+                            <Label className="text-sm font-black text-[#334155]">عدد التنبيهات</Label>
+                            <Input type="number" min="0" value={form.alertsCount} onChange={(event) => setForm((current) => ({ ...current, alertsCount: event.target.value }))} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
+                          </div>
+                          <div className="min-w-0 space-y-2 text-right">
+                            <Label className="text-sm font-black text-[#334155]">عدد الأخطاء</Label>
+                            <Input type="number" min="0" value={form.mistakesCount} onChange={(event) => setForm((current) => ({ ...current, mistakesCount: event.target.value }))} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
+                          </div>
+
+                          <div className="flex justify-end lg:pb-0.5">
+                            <Button onClick={handleSaveExam} disabled={isSaving || tableMissing || !form.selectedJuz} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7] lg:w-auto">
+                              {isSaving ? "جاري الحفظ..." : "حفظ الاختبار"}
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {selectedStudent ? (
+                      <Card className="rounded-[30px] border-[#dde6f0] bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
+                        <CardHeader className="text-right">
+                          <CardTitle className="flex items-center justify-start gap-2 text-2xl font-black text-[#1a2332]">
+                            <ClipboardCheck className="h-5 w-5 text-[#3453a7]" />
+                            سجل الاختبارات
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="overflow-x-auto rounded-[24px] border border-[#ebeff5]">
+                            <Table className="min-w-[760px]">
+                              <TableHeader>
+                                <TableRow className="bg-[#f8fafc] hover:bg-[#f8fafc]">
+                                  <TableHead className="text-right font-black text-[#475569]">الطالب</TableHead>
+                                  <TableHead className="text-right font-black text-[#475569]">النطاق</TableHead>
+                                  <TableHead className="text-right font-black text-[#475569]">التاريخ</TableHead>
+                                  <TableHead className="text-right font-black text-[#475569]">تنبيهات</TableHead>
+                                  <TableHead className="text-right font-black text-[#475569]">الأخطاء</TableHead>
+                                  <TableHead className="text-right font-black text-[#475569]">النتيجة</TableHead>
+                                  <TableHead className="text-right font-black text-[#475569]">الحالة</TableHead>
+                                  <TableHead className="text-right font-black text-[#475569]">المختبِر</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {studentExams.length > 0 ? studentExams.map((exam) => {
+                                  const student = normalizeStudentRelation(exam.students)
+                                  return (
+                                    <TableRow key={exam.id}>
+                                      <TableCell className="text-right font-bold text-[#1f2937]">{student?.name || "طالب"}</TableCell>
+                                      <TableCell className="text-right text-sm font-bold text-[#1f2937]">{getExamPortionDisplay(exam)}</TableCell>
+                                      <TableCell className="text-right text-sm font-semibold text-[#475569]">{exam.exam_date}</TableCell>
+                                      <TableCell className="text-right text-sm font-bold text-[#475569]">{exam.alerts_count}</TableCell>
+                                      <TableCell className="text-right text-sm font-bold text-[#475569]">{exam.mistakes_count}</TableCell>
+                                      <TableCell className="text-right text-sm font-black text-[#1f2937]">{exam.final_score}</TableCell>
+                                      <TableCell className="text-right">
+                                        <Badge className={`${getStatusTone(exam.passed)} border-0 px-3 py-1 text-xs font-black`}>
+                                          {exam.passed ? "مجتاز" : "غير مجتاز"}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="text-right text-sm font-semibold text-[#475569]">{exam.tested_by_name || "-"}</TableCell>
+                                    </TableRow>
+                                  )
+                                }) : (
+                                  <TableRow>
+                                    <TableCell colSpan={8} className="py-10 text-center text-sm font-bold text-[#7b8794]">لا توجد اختبارات مسجلة لهذا الطالب بعد.</TableCell>
+                                  </TableRow>
+                                )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </CardContent>
+                      </Card>
                     ) : null}
                   </div>
-
-                  <div className="min-w-0 space-y-2 text-right">
-                    <Label className="text-sm font-black text-[#334155]">اسم المختبر</Label>
-                    <Input value={form.testedByName} onChange={(event) => setForm((current) => ({ ...current, testedByName: event.target.value }))} placeholder="اكتب اسم المختبر" className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                  </div>
-
-                  <div className="min-w-0 space-y-2 text-right">
-                    <Label className="text-sm font-black text-[#334155]">عدد التنبيهات</Label>
-                    <Input type="number" min="0" value={form.alertsCount} onChange={(event) => setForm((current) => ({ ...current, alertsCount: event.target.value }))} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                  </div>
-                  <div className="min-w-0 space-y-2 text-right">
-                    <Label className="text-sm font-black text-[#334155]">عدد الأخطاء</Label>
-                    <Input type="number" min="0" value={form.mistakesCount} onChange={(event) => setForm((current) => ({ ...current, mistakesCount: event.target.value }))} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                  </div>
-
-                  <div className="flex justify-end lg:pb-0.5">
-                    <Button onClick={handleSaveExam} disabled={isSaving || tableMissing || !form.selectedJuz} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7] lg:w-auto">
-                      {isSaving ? "جاري الحفظ..." : "حفظ الاختبار"}
-                    </Button>
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card className="rounded-[30px] border-[#dde6f0] bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)] xl:col-span-2">
-              <CardHeader className="text-right">
-                <CardTitle className="flex items-center justify-start gap-2 text-2xl font-black text-[#1a2332]">
-                  <ClipboardCheck className="h-5 w-5 text-[#3453a7]" />
-                  سجل الاختبارات
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto rounded-[24px] border border-[#ebeff5]">
-                  <Table className="min-w-[760px]">
-                    <TableHeader>
-                      <TableRow className="bg-[#f8fafc] hover:bg-[#f8fafc]">
-                        <TableHead className="text-right font-black text-[#475569]">الطالب</TableHead>
-                        <TableHead className="text-right font-black text-[#475569]">النطاق</TableHead>
-                        <TableHead className="text-right font-black text-[#475569]">التاريخ</TableHead>
-                        <TableHead className="text-right font-black text-[#475569]">تنبيهات</TableHead>
-                        <TableHead className="text-right font-black text-[#475569]">الأخطاء</TableHead>
-                        <TableHead className="text-right font-black text-[#475569]">النتيجة</TableHead>
-                        <TableHead className="text-right font-black text-[#475569]">الحالة</TableHead>
-                        <TableHead className="text-right font-black text-[#475569]">المختبِر</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {studentExams.length > 0 ? studentExams.map((exam) => {
-                        const student = normalizeStudentRelation(exam.students)
-                        return (
-                          <TableRow key={exam.id}>
-                            <TableCell className="text-right font-bold text-[#1f2937]">{student?.name || "طالب"}</TableCell>
-                            <TableCell className="text-right text-sm font-bold text-[#1f2937]">{getExamPortionDisplay(exam)}</TableCell>
-                            <TableCell className="text-right text-sm font-semibold text-[#475569]">{exam.exam_date}</TableCell>
-                            <TableCell className="text-right text-sm font-bold text-[#475569]">{exam.alerts_count}</TableCell>
-                            <TableCell className="text-right text-sm font-bold text-[#475569]">{exam.mistakes_count}</TableCell>
-                            <TableCell className="text-right text-sm font-black text-[#1f2937]">{exam.final_score}</TableCell>
-                            <TableCell className="text-right">
-                              <Badge className={`${getStatusTone(exam.passed)} border-0 px-3 py-1 text-xs font-black`}>
-                                {exam.passed ? "مجتاز" : "غير مجتاز"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right text-sm font-semibold text-[#475569]">{exam.tested_by_name || "-"}</TableCell>
-                          </TableRow>
-                        )
-                      }) : (
-                        <TableRow>
-                          <TableCell colSpan={8} className="py-10 text-center text-sm font-bold text-[#7b8794]">لا توجد اختبارات مسجلة لهذا الطالب بعد.</TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                <div className="flex flex-col-reverse justify-end gap-3 border-t border-[#e5edf6] px-4 py-4 sm:flex-row sm:px-6">
+                  <Button type="button" variant="outline" onClick={() => setIsExamDialogOpen(false)} className="h-11 w-full rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] hover:bg-[#f8fbff] sm:w-auto">
+                    إغلاق
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </section>
-          )}
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-4xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>

@@ -179,6 +179,8 @@ function normalizeTeacherRole(value: unknown) {
   return "teacher" as const
 }
 
+type AddTeacherDialogView = "options" | "single" | "bulk"
+
 export default function TeacherManagement() {
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("إدارة المعلمين");
 
@@ -191,9 +193,8 @@ export default function TeacherManagement() {
   const [newTeacherAccountNumber, setNewTeacherAccountNumber] = useState("")
   const [selectedHalaqah, setSelectedHalaqah] = useState("")
   const [newTeacherRole, setNewTeacherRole] = useState<"teacher" | "deputy_teacher">("teacher")
-  const [isAddOptionsDialogOpen, setIsAddOptionsDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false)
+  const [addDialogView, setAddDialogView] = useState<AddTeacherDialogView>("options")
   const [isSavingAdd, setIsSavingAdd] = useState(false)
   const [isSavingBulk, setIsSavingBulk] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -288,6 +289,7 @@ export default function TeacherManagement() {
           setNewTeacherAccountNumber("")
           setSelectedHalaqah("")
           setNewTeacherRole("teacher")
+          setAddDialogView("options")
           setIsAddDialogOpen(false)
           await showAlert(`تم إضافة ${roleLabel} ${addedTeacherName} إلى ${addedTeacherHalaqah} بنجاح`, "نجاح")
         } else {
@@ -448,7 +450,8 @@ export default function TeacherManagement() {
 
       await fetchTeachers()
       setBulkTeachers([createBulkTeacherDraft()])
-      setIsBulkDialogOpen(false)
+      setAddDialogView("options")
+      setIsAddDialogOpen(false)
 
       if (Array.isArray(data.rejectedRows) && data.rejectedRows.length > 0) {
         const rejectedSummary = data.rejectedRows
@@ -540,198 +543,200 @@ export default function TeacherManagement() {
 
             <button
               type="button"
-              onClick={() => setIsAddOptionsDialogOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#3453a7]/50 bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors"
+              onClick={() => {
+                setAddDialogView("options")
+                setIsAddDialogOpen(true)
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#3453a7]/50 bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors outline-none focus-visible:outline-none focus-visible:ring-0"
             >
               <Plus className="w-4 h-4" />
               إضافة
             </button>
 
-            <Dialog open={isAddOptionsDialogOpen} onOpenChange={setIsAddOptionsDialogOpen}>
-              <DialogContent className="sm:max-w-[420px]">
+            <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+              setIsAddDialogOpen(open)
+              if (!open) {
+                setAddDialogView("options")
+              }
+            }}>
+              <DialogContent className={addDialogView === "bulk" ? "sm:max-w-[1100px] max-h-[90vh] overflow-y-auto" : addDialogView === "single" ? "sm:max-w-[480px]" : "sm:max-w-[420px]"}>
                 <DialogHeader>
-                  <DialogTitle className="text-xl text-[#1a2332]">اختر نوع الإضافة</DialogTitle>
-                  <DialogDescription className="text-right text-sm leading-7 text-neutral-500">
-                    اختر بين إضافة معلم واحد أو إضافة جماعية من خلال الإدخال اليدوي أو ملف إكسل.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-3 py-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddOptionsDialogOpen(false)
-                      setIsAddDialogOpen(true)
-                    }}
-                    className="flex items-center justify-between rounded-2xl border border-[#3453a7]/20 bg-[#f8fbff] px-4 py-4 text-right transition-colors hover:bg-[#eef4ff]"
-                  >
-                    <Plus className="h-5 w-5 text-[#3453a7]" />
-                    <div className="space-y-1">
-                      <div className="text-sm font-bold text-[#1a2332]">إضافة معلم</div>
-                      <div className="text-xs text-neutral-500">إضافة سجل واحد بشكل يدوي.</div>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddOptionsDialogOpen(false)
-                      setIsBulkDialogOpen(true)
-                    }}
-                    className="flex items-center justify-between rounded-2xl border border-[#3453a7]/20 bg-white px-4 py-4 text-right transition-colors hover:bg-[#f8fbff]"
-                  >
-                    <Upload className="h-5 w-5 text-[#3453a7]" />
-                    <div className="space-y-1">
-                      <div className="text-sm font-bold text-[#1a2332]">إضافة جماعية</div>
-                      <div className="text-xs text-neutral-500">رفع إكسل أو إدخال عدة معلمين دفعة واحدة.</div>
-                    </div>
-                  </button>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Add Teacher Dialog */}
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogContent className="sm:max-w-[480px]">
-                <DialogHeader>
-                  <DialogTitle className="text-xl text-[#1a2332]">إضافة معلم جديد</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="teacherName" className="text-sm font-semibold text-[#1a2332]">اسم المعلم</Label>
-                    <Input id="teacherName" value={newTeacherName} onChange={(e) => setNewTeacherName(e.target.value)} placeholder="أدخل اسم المعلم" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="teacherAccountNumber" className="text-sm font-semibold text-[#1a2332]">رقم الحساب</Label>
-                    <Input id="teacherAccountNumber" value={newTeacherAccountNumber} onChange={(e) => setNewTeacherAccountNumber(e.target.value)} placeholder="أدخل رقم الحساب" dir="ltr" type="number" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="teacherIdNumber" className="text-sm font-semibold text-[#1a2332]">رقم الهوية</Label>
-                    <Input id="teacherIdNumber" value={newTeacherIdNumber} onChange={(e) => setNewTeacherIdNumber(e.target.value)} placeholder="أدخل رقم الهوية" dir="ltr" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="halaqah" className="text-sm font-semibold text-[#1a2332]">اختر الحلقة</Label>
-                    <Select value={selectedHalaqah} onValueChange={setSelectedHalaqah}>
-                      <SelectTrigger><SelectValue placeholder="اختر الحلقة" /></SelectTrigger>
-                      <SelectContent>
-                        {circles.map((circle) => (
-                          <SelectItem key={circle.id} value={circle.name}>{circle.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="teacherRole" className="text-sm font-semibold text-[#1a2332]">المسمى الوظيفي</Label>
-                    <Select value={newTeacherRole} onValueChange={(v) => setNewTeacherRole(v as "teacher" | "deputy_teacher")}>
-                      <SelectTrigger><SelectValue placeholder="اختر المسمى" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="teacher">معلم</SelectItem>
-                        <SelectItem value="deputy_teacher">نائب معلم</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3">
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="border-[#3453a7]/50 text-neutral-600">إلغاء</Button>
-                  <Button onClick={handleAddTeacher} disabled={isSavingAdd} className="border border-[#3453a7]/50 bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] hover:text-[#3453a7] disabled:cursor-not-allowed disabled:opacity-60">{isSavingAdd ? "جاري الحفظ..." : "حفظ"}</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
-              <DialogContent className="sm:max-w-[1100px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="text-xl text-[#1a2332]">إضافة جماعية للمعلمين</DialogTitle>
-                  <DialogDescription className="text-right text-sm leading-7 text-neutral-500">
-                    يمكنك الإدخال اليدوي أو رفع ملف إكسل. عند الرفع سيتم أخذ اسم المعلم ورقم الهوية وتحويله تلقائيًا إلى رقم الحساب، وسيبقى اختيار الحلقة فارغًا إلا إذا تم العثور على حلقة مطابقة أو قريبة جدًا.
-                  </DialogDescription>
+                  <DialogTitle className="text-xl text-[#1a2332]">
+                    {addDialogView === "bulk" ? "إضافة جماعية للمعلمين" : addDialogView === "single" ? "إضافة معلم جديد" : "إضافة معلم"}
+                  </DialogTitle>
+                  {addDialogView === "options" ? (
+                    <DialogDescription className="text-right text-sm leading-7 text-neutral-500">
+                      اختر بين إضافة معلم واحد أو إضافة جماعية من خلال الإدخال اليدوي أو ملف إكسل.
+                    </DialogDescription>
+                  ) : addDialogView === "bulk" ? (
+                    <DialogDescription className="text-right text-sm leading-7 text-neutral-500">
+                      يمكنك الإدخال اليدوي أو رفع ملف إكسل. عند الرفع سيتم أخذ اسم المعلم ورقم الهوية وتحويله تلقائيًا إلى رقم الحساب، وسيبقى اختيار الحلقة فارغًا إلا إذا تم العثور على حلقة مطابقة أو قريبة جدًا.
+                    </DialogDescription>
+                  ) : null}
                 </DialogHeader>
 
-                <div className="space-y-5 py-2">
-                  <div className="flex flex-col gap-3 rounded-2xl border border-[#3453a7]/20 bg-[#fafcff] p-4 md:flex-row md:items-center md:justify-between">
-                    <div className="space-y-1 text-right">
-                      <p className="text-sm font-bold text-[#1a2332]">رفع ملف إكسل</p>
-                      <p className="text-xs text-neutral-500">الأعمدة المدعومة: اسم المعلم، رقم الهوية، الحلقة.</p>
-                    </div>
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#3453a7]/40 bg-white px-4 py-2 text-sm font-semibold text-[#4f73d1] transition-colors hover:bg-[#3453a7]/10">
-                      <Upload className="h-4 w-4" />
-                      رفع إكسل
-                      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportTeachersFile} />
-                    </label>
-                  </div>
-
-                  <div className="space-y-3">
-                    {bulkTeachers.map((draft, index) => (
-                      <div key={draft.id} className="rounded-2xl border border-[#3453a7]/20 bg-white p-4 shadow-sm">
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <div className="text-sm font-bold text-[#1a2332]">المعلم {index + 1}</div>
-                          <button
-                            type="button"
-                            onClick={() => removeBulkTeacherRow(draft.id)}
-                            className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            حذف
-                          </button>
-                        </div>
-
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-[#1a2332]">اسم المعلم</Label>
-                            <Input value={draft.name} onChange={(event) => updateBulkTeacher(draft.id, { name: event.target.value })} placeholder="اسم المعلم" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-[#1a2332]">رقم الهوية</Label>
-                            <Input value={draft.idNumber} onChange={(event) => updateBulkTeacher(draft.id, { idNumber: event.target.value })} placeholder="رقم الهوية" dir="ltr" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-[#1a2332]">رقم الحساب</Label>
-                            <Input value={draft.accountNumber} onChange={(event) => updateBulkTeacher(draft.id, { accountNumber: event.target.value })} placeholder="رقم الحساب" dir="ltr" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-[#1a2332]">رقم الجوال</Label>
-                            <Input value={draft.phoneNumber} onChange={(event) => updateBulkTeacher(draft.id, { phoneNumber: event.target.value })} placeholder="اختياري" dir="ltr" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-[#1a2332]">الحلقة</Label>
-                            <Select value={draft.selectedHalaqah} onValueChange={(value) => updateBulkTeacher(draft.id, { selectedHalaqah: value })}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="اختيار" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {circles.map((circle) => (
-                                  <SelectItem key={`${draft.id}-${circle.id}`} value={circle.name}>{circle.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-[#1a2332]">المسمى الوظيفي</Label>
-                            <Select value={draft.role} onValueChange={(value) => updateBulkTeacher(draft.id, { role: value as "teacher" | "deputy_teacher" })}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="اختر المسمى" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="teacher">معلم</SelectItem>
-                                <SelectItem value="deputy_teacher">نائب معلم</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
+                {addDialogView === "options" ? (
+                  <div className="grid gap-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => setAddDialogView("single")}
+                      className="flex items-center justify-between rounded-2xl border border-[#3453a7]/20 bg-[#f8fbff] px-4 py-4 text-right transition-colors hover:bg-[#eef4ff] outline-none focus-visible:outline-none focus-visible:ring-0"
+                    >
+                      <Plus className="h-5 w-5 text-[#3453a7]" />
+                      <div className="space-y-1">
+                        <div className="text-sm font-bold text-[#1a2332]">إضافة معلم</div>
+                        <div className="text-xs text-neutral-500">إضافة سجل واحد بشكل يدوي.</div>
                       </div>
-                    ))}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddDialogView("bulk")}
+                      className="flex items-center justify-between rounded-2xl border border-[#3453a7]/20 bg-white px-4 py-4 text-right transition-colors hover:bg-[#f8fbff] outline-none focus-visible:outline-none focus-visible:ring-0"
+                    >
+                      <Upload className="h-5 w-5 text-[#3453a7]" />
+                      <div className="space-y-1">
+                        <div className="text-sm font-bold text-[#1a2332]">إضافة جماعية</div>
+                        <div className="text-xs text-neutral-500">رفع إكسل أو إدخال عدة معلمين دفعة واحدة.</div>
+                      </div>
+                    </button>
                   </div>
+                ) : null}
 
-                  <div className="flex justify-start">
-                    <Button type="button" variant="outline" onClick={addBulkTeacherRow} className="border-[#3453a7]/50 text-[#4f73d1] hover:bg-[#3453a7]/10">
-                      <Plus className="me-2 h-4 w-4" />
-                      إضافة صف جديد
-                    </Button>
-                  </div>
-                </div>
+                {addDialogView === "single" ? (
+                  <>
+                    <div className="grid gap-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="teacherName" className="text-sm font-semibold text-[#1a2332]">اسم المعلم</Label>
+                        <Input id="teacherName" value={newTeacherName} onChange={(e) => setNewTeacherName(e.target.value)} placeholder="أدخل اسم المعلم" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="teacherAccountNumber" className="text-sm font-semibold text-[#1a2332]">رقم الحساب</Label>
+                        <Input id="teacherAccountNumber" value={newTeacherAccountNumber} onChange={(e) => setNewTeacherAccountNumber(e.target.value)} placeholder="أدخل رقم الحساب" dir="ltr" type="number" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="teacherIdNumber" className="text-sm font-semibold text-[#1a2332]">رقم الهوية</Label>
+                        <Input id="teacherIdNumber" value={newTeacherIdNumber} onChange={(e) => setNewTeacherIdNumber(e.target.value)} placeholder="أدخل رقم الهوية" dir="ltr" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="halaqah" className="text-sm font-semibold text-[#1a2332]">اختر الحلقة</Label>
+                        <Select value={selectedHalaqah} onValueChange={setSelectedHalaqah}>
+                          <SelectTrigger><SelectValue placeholder="اختر الحلقة" /></SelectTrigger>
+                          <SelectContent>
+                            {circles.map((circle) => (
+                              <SelectItem key={circle.id} value={circle.name}>{circle.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="teacherRole" className="text-sm font-semibold text-[#1a2332]">المسمى الوظيفي</Label>
+                        <Select value={newTeacherRole} onValueChange={(v) => setNewTeacherRole(v as "teacher" | "deputy_teacher")}>
+                          <SelectTrigger><SelectValue placeholder="اختر المسمى" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="teacher">معلم</SelectItem>
+                            <SelectItem value="deputy_teacher">نائب معلم</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                      <Button variant="outline" onClick={() => setAddDialogView("options")} className="border-[#3453a7]/50 text-neutral-600">رجوع</Button>
+                      <Button onClick={handleAddTeacher} disabled={isSavingAdd} className="border border-[#3453a7]/50 bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] hover:text-[#3453a7] disabled:cursor-not-allowed disabled:opacity-60">{isSavingAdd ? "جاري الحفظ..." : "حفظ"}</Button>
+                    </div>
+                  </>
+                ) : null}
 
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button variant="outline" onClick={() => setIsBulkDialogOpen(false)} className="border-[#3453a7]/50 text-neutral-600">إلغاء</Button>
-                  <Button onClick={handleBulkAddTeachers} disabled={isSavingBulk} className="border border-[#3453a7]/50 bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] hover:text-[#3453a7] disabled:cursor-not-allowed disabled:opacity-60">{isSavingBulk ? "جاري الإضافة..." : "إضافة المعلمين"}</Button>
-                </div>
+                {addDialogView === "bulk" ? (
+                  <>
+                    <div className="space-y-5 py-2">
+                      <div className="flex flex-col gap-3 rounded-2xl border border-[#3453a7]/20 bg-[#fafcff] p-4 md:flex-row md:items-center md:justify-between">
+                        <div className="space-y-1 text-right">
+                          <p className="text-sm font-bold text-[#1a2332]">رفع ملف إكسل</p>
+                          <p className="text-xs text-neutral-500">الأعمدة المدعومة: اسم المعلم، رقم الهوية، الحلقة.</p>
+                        </div>
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#3453a7]/40 bg-white px-4 py-2 text-sm font-semibold text-[#4f73d1] transition-colors hover:bg-[#3453a7]/10">
+                          <Upload className="h-4 w-4" />
+                          رفع إكسل
+                          <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportTeachersFile} />
+                        </label>
+                      </div>
+
+                      <div className="space-y-3">
+                        {bulkTeachers.map((draft, index) => (
+                          <div key={draft.id} className="rounded-2xl border border-[#3453a7]/20 bg-white p-4 shadow-sm">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <div className="text-sm font-bold text-[#1a2332]">المعلم {index + 1}</div>
+                              <button
+                                type="button"
+                                onClick={() => removeBulkTeacherRow(draft.id)}
+                                className="flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                حذف
+                              </button>
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                              <div className="space-y-2">
+                                <Label className="text-sm font-semibold text-[#1a2332]">اسم المعلم</Label>
+                                <Input value={draft.name} onChange={(event) => updateBulkTeacher(draft.id, { name: event.target.value })} placeholder="اسم المعلم" />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-semibold text-[#1a2332]">رقم الهوية</Label>
+                                <Input value={draft.idNumber} onChange={(event) => updateBulkTeacher(draft.id, { idNumber: event.target.value })} placeholder="رقم الهوية" dir="ltr" />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-semibold text-[#1a2332]">رقم الحساب</Label>
+                                <Input value={draft.accountNumber} onChange={(event) => updateBulkTeacher(draft.id, { accountNumber: event.target.value })} placeholder="رقم الحساب" dir="ltr" />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-semibold text-[#1a2332]">رقم الجوال</Label>
+                                <Input value={draft.phoneNumber} onChange={(event) => updateBulkTeacher(draft.id, { phoneNumber: event.target.value })} placeholder="اختياري" dir="ltr" />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-semibold text-[#1a2332]">الحلقة</Label>
+                                <Select value={draft.selectedHalaqah} onValueChange={(value) => updateBulkTeacher(draft.id, { selectedHalaqah: value })}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="اختيار" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {circles.map((circle) => (
+                                      <SelectItem key={`${draft.id}-${circle.id}`} value={circle.name}>{circle.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-semibold text-[#1a2332]">المسمى الوظيفي</Label>
+                                <Select value={draft.role} onValueChange={(value) => updateBulkTeacher(draft.id, { role: value as "teacher" | "deputy_teacher" })}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="اختر المسمى" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="teacher">معلم</SelectItem>
+                                    <SelectItem value="deputy_teacher">نائب معلم</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex justify-start">
+                        <Button type="button" variant="outline" onClick={addBulkTeacherRow} className="border-[#3453a7]/50 text-[#4f73d1] hover:bg-[#3453a7]/10">
+                          <Plus className="me-2 h-4 w-4" />
+                          إضافة صف جديد
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <Button variant="outline" onClick={() => setAddDialogView("options")} className="border-[#3453a7]/50 text-neutral-600">رجوع</Button>
+                      <Button onClick={handleBulkAddTeachers} disabled={isSavingBulk} className="border border-[#3453a7]/50 bg-[#3453a7]/10 hover:bg-[#3453a7]/20 text-[#4f73d1] hover:text-[#3453a7] disabled:cursor-not-allowed disabled:opacity-60">{isSavingBulk ? "جاري الإضافة..." : "إضافة المعلمين"}</Button>
+                    </div>
+                  </>
+                ) : null}
               </DialogContent>
             </Dialog>
 
