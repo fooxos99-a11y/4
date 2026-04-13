@@ -10,11 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowRight, BookOpen, Trophy, Users } from "lucide-react"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 export default function PathwaysResultsPage() {
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("إدارة المسار");
 
@@ -58,6 +53,10 @@ export default function PathwaysResultsPage() {
   async function loadLevels() {
     if (!selectedHalaqah) return;
     setIsLoading(true)
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
     const { data } = await supabase
       .from("pathway_levels")
       .select("level_number, title")
@@ -73,6 +72,10 @@ export default function PathwaysResultsPage() {
   }
 
   async function loadResults(levelNumber: string) {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
     const { data, error } = await supabase
       .from("pathway_level_completions")
       .select("id, student_id, points, level_number, students(name)")

@@ -7,6 +7,8 @@ import {
   calculatePreviousMemorizedPages,
   getContiguousCompletedJuzRange,
   getAdjustedPlanPreviewRange,
+  getStoredMemorizedRanges,
+  getLegacyPreviousMemorizationFields,
   getJuzBounds,
   getJuzNumbersForPageRange,
   getPreviousMemorizationBoundary,
@@ -886,6 +888,31 @@ export async function POST(request: Request) {
     }
 
     const attendanceMemorizedRanges = getAttendanceMemorizedRanges(memorizationAttendance || [])
+    if (attendanceMemorizedRanges.length > 0) {
+      const persistedStudentRanges = getStoredMemorizedRanges(studentMemorizedData || {})
+      const nextStudentRanges = getStoredMemorizedRanges({
+        memorized_ranges: [...persistedStudentRanges, ...attendanceMemorizedRanges],
+      })
+
+      if (JSON.stringify(nextStudentRanges) !== JSON.stringify(persistedStudentRanges)) {
+        const legacyFields = getLegacyPreviousMemorizationFields(nextStudentRanges)
+        const { error: persistStudentMemorizationError } = await supabase
+          .from("students")
+          .update({
+            memorized_start_surah: legacyFields.prev_start_surah,
+            memorized_start_verse: legacyFields.prev_start_verse,
+            memorized_end_surah: legacyFields.prev_end_surah,
+            memorized_end_verse: legacyFields.prev_end_verse,
+            memorized_ranges: nextStudentRanges.length > 0 ? nextStudentRanges : null,
+          })
+          .eq("id", student_id)
+
+        if (persistStudentMemorizationError) {
+          console.error("[plans] Failed to persist attendance memorization onto student:", persistStudentMemorizationError)
+        }
+      }
+    }
+
     const effectiveBlockedRanges = normalizePreviousMemorizationRanges([
       ...effectivePreviousRanges,
       ...attendanceMemorizedRanges,

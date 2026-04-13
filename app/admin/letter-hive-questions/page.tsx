@@ -19,7 +19,6 @@ export default function LetterHiveQuestionsAdmin() {
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [newQuestion, setNewQuestion] = useState("");
   const [newAnswer, setNewAnswer] = useState("");
-  const supabase = createClient();
 
   const PRIMARY_COLOR = "#cc994b";
 
@@ -29,6 +28,7 @@ export default function LetterHiveQuestionsAdmin() {
 
   async function fetchQuestions() {
     setLoading(true);
+    const supabase = createClient();
     const { data, error } = await supabase.from("letter_hive_questions").select();
     if (!error && data) {
       const grouped: Record<string, {question: string, answer: string}[]> = {};
@@ -43,6 +43,7 @@ export default function LetterHiveQuestionsAdmin() {
 
   async function addQuestion() {
     if (!selectedLetter || !newQuestion || !newAnswer) return;
+    const supabase = createClient();
     const { error } = await supabase.from("letter_hive_questions").insert({ 
         letter: selectedLetter, 
         question: newQuestion, 
@@ -56,6 +57,7 @@ export default function LetterHiveQuestionsAdmin() {
   }
 
   async function deleteQuestion(letter: string, question: string) {
+    const supabase = createClient();
     await supabase.from("letter_hive_questions").delete().eq("letter", letter).eq("question", question);
     fetchQuestions();
   }

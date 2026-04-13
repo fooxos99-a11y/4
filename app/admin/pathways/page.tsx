@@ -79,10 +79,12 @@ interface Quiz {
 
 /* -------------------------------------------------------------------------- */
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+function getSupabase() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 export default function AdminPathwaysPage() {
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("إدارة المسار");
@@ -190,6 +192,7 @@ export default function AdminPathwaysPage() {
 
   async function loadLevels() {
     if (!selectedHalaqah) return;
+    const supabase = getSupabase()
     const { data, error } = await supabase
       .from("pathway_levels").select("*").eq("halaqah", selectedHalaqah).order("level_number")
 
@@ -219,6 +222,7 @@ export default function AdminPathwaysPage() {
   async function loadLevelResults() {
     if (!selectedLevel || !selectedHalaqah) return;
     setIsLoadingResults(true);
+    const supabase = getSupabase()
     const { data, error } = await supabase
       .from("pathway_level_completions")
       .select("id, student_id, points, level_number, students!inner(name, halaqah)")
@@ -239,6 +243,7 @@ export default function AdminPathwaysPage() {
   }
 
   async function loadQuizzes() {
+    const supabase = getSupabase()
     const { data } = await supabase
       .from("pathway_level_questions").select("*").eq("level_number", selectedLevel).eq("halaqah", selectedHalaqah)
       .order("id")
@@ -266,6 +271,7 @@ export default function AdminPathwaysPage() {
     let finalUrl = contentUrl
 
     if (uploadMode === "file" && selectedFile) {
+      const supabase = getSupabase()
       setIsUploading(true)
       const ext = selectedFile.name.split(".").pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
@@ -318,6 +324,7 @@ export default function AdminPathwaysPage() {
   async function handleAddQuiz() {
     if (!quizQuestion || quizOptions.some((o) => !o)) return
 
+    const supabase = getSupabase()
     await supabase.from("pathway_level_questions").insert({
       level_number: selectedLevel, halaqah: selectedHalaqah, question: quizQuestion,
       options: quizOptions,
@@ -332,6 +339,7 @@ export default function AdminPathwaysPage() {
   }
 
   async function handleDeleteQuiz(id: number) {
+    const supabase = getSupabase()
     await supabase.from("pathway_level_questions").delete().eq("id", id)
     loadQuizzes()
   }
@@ -425,6 +433,7 @@ export default function AdminPathwaysPage() {
     // احصل على رقم آخر مستوى
     const maxLevel = Math.max(...levels.map(l => l.level_number));
     // حذف بدون تأكيد
+    const supabase = getSupabase()
     const { error } = await supabase.from('pathway_levels').delete().eq('level_number', maxLevel).eq("halaqah", selectedHalaqah);
     if (!error) {
       showNotification('تم حذف آخر مستوى بنجاح');
@@ -452,6 +461,7 @@ export default function AdminPathwaysPage() {
 
   async function handleToggleLockLevel() {
     if (!level) return;
+    const supabase = getSupabase()
     const { error } = await supabase.from('pathway_levels').update({ is_locked: !level.is_locked }).eq('level_number', selectedLevel).eq("halaqah", selectedHalaqah);
     if (!error) {
       showNotification(level.is_locked ? 'تم فتح المستوى بنجاح' : 'تم قفل المستوى بنجاح');
@@ -782,6 +792,7 @@ export default function AdminPathwaysPage() {
               <button onClick={() => setShowEditModal(false)} className="px-4 py-2 rounded-lg border border-neutral-200 text-neutral-500 text-sm hover:bg-neutral-50 transition-colors">إلغاء</button>
               <button onClick={async () => {
                 if (level) {
+                  const supabase = getSupabase()
                   await supabase.from("pathway_levels").update({ title: editTitle, description: editDescription }).eq("id", level.id)
                   setShowEditModal(false)
                   loadLevels()
@@ -803,6 +814,7 @@ export default function AdminPathwaysPage() {
               <button onClick={() => setShowPointsModal(false)} className="px-4 py-2 rounded-lg border border-neutral-200 text-neutral-500 text-sm hover:bg-neutral-50 transition-colors">إلغاء</button>
               <button onClick={async () => {
                 if (pointsEditLevel) {
+                  const supabase = getSupabase()
                   await supabase.from("pathway_levels").update({ points: pointsEditValue }).eq("id", pointsEditLevel.id)
                   setShowPointsModal(false)
                   loadLevels()

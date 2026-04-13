@@ -247,8 +247,8 @@ export default function MusabHalaqahPage() {
 
       <main className="flex-1 py-16">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <div className="flex items-center justify-center gap-4 mb-6">
+          <div className="text-center mb-8 md:mb-16">
+            <div className="flex items-center justify-center gap-2 md:gap-4 mb-4 md:mb-6">
               <div className="h-px w-16 sm:w-24 bg-gradient-to-r from-transparent to-[#3453a7]" />
               <div
                 className="w-2.5 h-2.5 rounded-full bg-[#3453a7] animate-pulse"
@@ -259,12 +259,12 @@ export default function MusabHalaqahPage() {
 
             <div className="relative inline-block">
               <div className="absolute inset-0 bg-[#3453a7]/5 blur-3xl rounded-full" />
-              <h1 className="relative text-4xl md:text-5xl lg:text-6xl font-bold text-[#20335f] px-6 py-2 leading-tight">
+              <h1 className="relative text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold text-[#20335f] px-3 sm:px-4 md:px-6 py-2 leading-tight break-words">
                 حلقة مصعب بن عمير
               </h1>
             </div>
 
-            <div className="flex items-center justify-center gap-4 mt-6">
+            <div className="flex items-center justify-center gap-2 md:gap-4 mt-4 md:mt-6">
               <div className="h-px w-16 sm:w-24 bg-gradient-to-r from-transparent to-[#3453a7]" />
               <div
                 className="w-2.5 h-2.5 rounded-full bg-[#3453a7] animate-pulse"
@@ -276,7 +276,7 @@ export default function MusabHalaqahPage() {
 
           <TooltipProvider>
             <div className="max-w-5xl mx-auto">
-              <div className="grid grid-cols-1 gap-6">
+              <div className="grid grid-cols-1 gap-3 md:gap-6">
                 {topStudents.map((student, index) => {
                   const isLockedRank = isLockedLeaderboardRank(index)
                   const themeColors = isLockedRank ? getLockedLeaderboardTheme(index) : getThemeColors(student.preferred_theme)
@@ -308,8 +308,8 @@ export default function MusabHalaqahPage() {
 
                       {isForest && <ForestLeaves />}
 
-                      <div className="relative z-10 grid gap-4 p-4 md:grid-cols-[84px_minmax(0,1fr)_132px] md:items-center md:gap-5 md:p-6">
-                        <div className="flex items-center justify-center md:justify-start">
+                      <div className="relative z-10 grid grid-cols-[44px_minmax(0,1fr)_76px] items-center gap-x-2 p-3 sm:grid-cols-[56px_minmax(0,1fr)_88px] sm:gap-4 sm:p-4 md:grid-cols-[84px_minmax(0,1fr)_132px] md:gap-5 md:p-6">
+                        <div className="flex items-center justify-center sm:justify-start">
                           <div
                             className="relative flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_12px_28px_-18px_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:scale-105 md:h-16 md:w-16"
                             style={{
@@ -325,27 +325,27 @@ export default function MusabHalaqahPage() {
                           </div>
                         </div>
 
-                        <div className="min-w-0 text-center md:text-right">
+                        <div className="min-w-0 text-right">
                           <h3
-                            className={`text-xl font-black tracking-tight transition-colors duration-300 md:text-3xl ${
+                            className={`truncate text-sm sm:text-lg md:text-3xl font-black tracking-tight transition-colors duration-300 ${
                               isForest ? "text-[#166534] group-hover:text-[#14532d]" : "text-[#12312f] group-hover:text-[#1f4b47]"
                             }`}
                           >
                             {student.name}
                           </h3>
-                          <div className="mt-3 flex flex-wrap justify-center gap-1.5 md:justify-start md:gap-2">
+                          <div className="mt-2 flex flex-wrap justify-start gap-1 md:mt-3 md:gap-2">
                             {student.badges?.map((badge, idx) => (
                               <div key={idx} className="scale-90 md:scale-100">{renderBadge(badge)}</div>
                             ))}
                           </div>
                         </div>
 
-                        <div className="flex justify-center md:justify-end">
+                        <div className="flex justify-end">
                           <div
-                            className="min-w-[104px] rounded-[22px] border bg-white/90 px-4 py-3 text-center shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)] backdrop-blur"
+                            className="min-w-[76px] rounded-[18px] border bg-white/90 px-2.5 py-2 text-center shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)] backdrop-blur sm:min-w-[88px] sm:px-3.5 sm:py-2.5 md:min-w-[104px] md:rounded-[22px] md:px-4 md:py-3"
                             style={{ borderColor: isForest ? "#22C55E" : `${themeColors.primary}88` }}
                           >
-                            <div className={`text-2xl font-black leading-none md:text-3xl ${isForest ? "text-[#166534]" : "text-[#12312f]"}`}>
+                            <div className={`text-lg font-black leading-none sm:text-xl md:text-3xl ${isForest ? "text-[#166534]" : "text-[#12312f]"}`}>
                               {student.points || 0}
                             </div>
                           </div>

@@ -272,6 +272,7 @@ function ProfilePage() {
           endVerseNumber: Number(plan.end_verse) || SURAHS.find((surah) => surah.number === plan.end_surah_number)?.verseCount || 1,
           dailyPages: Number(plan.daily_pages) || 0,
           direction: (plan.direction as "asc" | "desc") || "asc",
+          previousMemorizationRanges: plan.previous_memorization_ranges,
           prevStartSurah: plan.prev_start_surah,
           prevStartVerse: plan.prev_start_verse,
           prevEndSurah: plan.prev_end_surah,
@@ -435,7 +436,11 @@ function ProfilePage() {
         ...planData,
         completed_juzs: planData.completed_juzs || studentData?.completed_juzs || [],
         current_juzs: planData.current_juzs || studentData?.current_juzs || [],
-        has_previous: planData.has_previous || !!(planData.prev_start_surah || studentData?.memorized_start_surah),
+        has_previous: planData.has_previous || !!(
+          planData.prev_start_surah
+          || (Array.isArray(planData.previous_memorization_ranges) && planData.previous_memorization_ranges.length > 0)
+          || studentData?.memorized_start_surah
+        ),
         prev_start_surah: planData.prev_start_surah || studentData?.memorized_start_surah || null,
         prev_start_verse: planData.prev_start_verse || studentData?.memorized_start_verse || null,
         prev_end_surah: planData.prev_end_surah || studentData?.memorized_end_surah || null,
@@ -725,6 +730,7 @@ function ProfilePage() {
                     endVerseNumber: Number(planData.end_verse) || SURAHS.find((surah) => surah.number === planData.end_surah_number)?.verseCount || 1,
                     dailyPages: Number(planData.daily_pages) || 0,
                     direction: (planData.direction as "asc" | "desc") || "asc",
+                    previousMemorizationRanges: planData.previous_memorization_ranges,
                     prevStartSurah: planData.prev_start_surah,
                     prevStartVerse: planData.prev_start_verse,
                     prevEndSurah: planData.prev_end_surah,

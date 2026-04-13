@@ -38,6 +38,7 @@ type PlanRow = {
   prev_start_verse?: number | null
   prev_end_surah?: number | null
   prev_end_verse?: number | null
+  previous_memorization_ranges?: unknown[] | null
   completed_juzs?: number[] | null
 }
 
@@ -275,7 +276,7 @@ export async function GET(request: Request) {
 
     let plansQuery = supabase
       .from("student_plans")
-      .select("id, student_id, start_date, created_at, daily_pages, muraajaa_pages, rabt_pages, review_distribution_mode, muraajaa_mode, weekly_muraajaa_min_daily_pages, weekly_muraajaa_start_day, weekly_muraajaa_end_day, has_previous, prev_start_surah, prev_start_verse, prev_end_surah, prev_end_verse, completed_juzs")
+      .select("id, student_id, start_date, created_at, daily_pages, muraajaa_pages, rabt_pages, review_distribution_mode, muraajaa_mode, weekly_muraajaa_min_daily_pages, weekly_muraajaa_start_day, weekly_muraajaa_end_day, has_previous, prev_start_surah, prev_start_verse, prev_end_surah, prev_end_verse, previous_memorization_ranges, completed_juzs")
       .in("student_id", studentIds)
 
     let attendanceRangeQuery = supabase

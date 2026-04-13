@@ -8,7 +8,7 @@ import { formatExamPortionLabel, getEligibleExamPortions } from "@/lib/student-e
 import { getScheduledSessionProgress } from "@/lib/plan-progress"
 import { insertNotificationsAndSendPush } from "@/lib/push-notifications"
 import { getSaudiDateString } from "@/lib/saudi-time"
-import { getContiguousCompletedJuzRange, getJuzBounds, getNormalizedCompletedJuzs, getPendingMasteryJuzs, getStoredMemorizedRanges, hasScatteredCompletedJuzs, subtractMemorizedRangeFromRanges } from "@/lib/quran-data"
+import { getJuzBounds, getLegacyPreviousMemorizationFields, getNormalizedCompletedJuzs, getPendingMasteryJuzs, getStoredMemorizedRanges, subtractMemorizedRangeFromRanges } from "@/lib/quran-data"
 import { getOrCreateActiveSemester, isMissingSemestersTable, isNoActiveSemesterError } from "@/lib/semesters"
 import { buildExamAppNotificationMessage, fillExamWhatsAppTemplate, getExamWhatsAppTemplates } from "@/lib/whatsapp-notification-templates"
 import { enqueueWhatsAppMessage } from "@/lib/whatsapp-queue"
@@ -64,6 +64,30 @@ function formatExamDate(dateValue: string) {
 
 function isValidIsoDate(value: string) {
 	return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim())
+}
+
+function buildStudentMemorizedRanges(student: {
+	memorized_ranges?: unknown[] | null
+	memorized_start_surah?: number | null
+	memorized_start_verse?: number | null
+	memorized_end_surah?: number | null
+	memorized_end_verse?: number | null
+	completed_juzs?: number[] | null
+}) {
+	const storedRanges = getStoredMemorizedRanges(student)
+	const completedJuzRanges = getNormalizedCompletedJuzs(student.completed_juzs)
+		.map((juzNumber) => getJuzBounds(juzNumber))
+		.filter((bounds): bounds is NonNullable<ReturnType<typeof getJuzBounds>> => Boolean(bounds))
+		.map((bounds) => ({
+			startSurahNumber: bounds.startSurahNumber,
+			startVerseNumber: bounds.startVerseNumber,
+			endSurahNumber: bounds.endSurahNumber,
+			endVerseNumber: bounds.endVerseNumber,
+		}))
+
+	return getStoredMemorizedRanges({
+		memorized_ranges: [...storedRanges, ...completedJuzRanges],
+	})
 }
 
 function hasCompletedMemorization(record: any) {
@@ -153,6 +177,10 @@ async function markFailedJuzForRememorization(
 		completed_juzs?: number[] | null
 		current_juzs?: number[] | null
 		memorized_ranges?: unknown[] | null
+		memorized_start_surah?: number | null
+		memorized_start_verse?: number | null
+		memorized_end_surah?: number | null
+		memorized_end_verse?: number | null
 	},
 	failedJuzNumber: number,
 ) {
@@ -162,7 +190,7 @@ async function markFailedJuzForRememorization(
 		failedJuzNumber,
 	])).sort((left, right) => left - right)
 	const failedJuzBounds = getJuzBounds(failedJuzNumber)
-	const currentRanges = getStoredMemorizedRanges(student)
+	const currentRanges = buildStudentMemorizedRanges(student)
 	const nextRanges = failedJuzBounds
 		? subtractMemorizedRangeFromRanges(currentRanges, {
 			startSurahNumber: failedJuzBounds.startSurahNumber,
@@ -171,10 +199,7 @@ async function markFailedJuzForRememorization(
 			endVerseNumber: failedJuzBounds.endVerseNumber,
 		})
 		: currentRanges
-
-	const completedRange = hasScatteredCompletedJuzs(nextCompletedJuzs)
-		? null
-		: getContiguousCompletedJuzRange(nextCompletedJuzs)
+	const legacyFields = getLegacyPreviousMemorizationFields(nextRanges)
 
 	const { error: updateStudentError } = await supabase
 		.from("students")
@@ -182,10 +207,10 @@ async function markFailedJuzForRememorization(
 			completed_juzs: nextCompletedJuzs,
 			current_juzs: nextCurrentJuzs,
 			memorized_ranges: nextRanges.length > 0 ? nextRanges : null,
-			memorized_start_surah: completedRange?.startSurahNumber || null,
-			memorized_start_verse: completedRange?.startVerseNumber || null,
-			memorized_end_surah: completedRange?.endSurahNumber || null,
-			memorized_end_verse: completedRange?.endVerseNumber || null,
+			memorized_start_surah: legacyFields.prev_start_surah,
+			memorized_start_verse: legacyFields.prev_start_verse,
+			memorized_end_surah: legacyFields.prev_end_surah,
+			memorized_end_verse: legacyFields.prev_end_verse,
 		})
 		.eq("id", student.id)
 
@@ -200,6 +225,11 @@ async function markPassedJuzAsMemorized(
 		id: string
 		completed_juzs?: number[] | null
 		current_juzs?: number[] | null
+		memorized_ranges?: unknown[] | null
+		memorized_start_surah?: number | null
+		memorized_start_verse?: number | null
+		memorized_end_surah?: number | null
+		memorized_end_verse?: number | null
 	},
 	passedJuzNumber: number,
 ) {
@@ -208,19 +238,22 @@ async function markPassedJuzAsMemorized(
 		passedJuzNumber,
 	])).sort((left, right) => left - right)
 	const nextCurrentJuzs = getPendingMasteryJuzs(student.current_juzs, nextCompletedJuzs).filter((juzNumber) => juzNumber !== passedJuzNumber)
-	const completedRange = hasScatteredCompletedJuzs(nextCompletedJuzs)
-		? null
-		: getContiguousCompletedJuzRange(nextCompletedJuzs)
+	const nextRanges = buildStudentMemorizedRanges({
+		...student,
+		completed_juzs: nextCompletedJuzs,
+	})
+	const legacyFields = getLegacyPreviousMemorizationFields(nextRanges)
 
 	const { error: updateStudentError } = await supabase
 		.from("students")
 		.update({
 			completed_juzs: nextCompletedJuzs,
 			current_juzs: nextCurrentJuzs,
-			memorized_start_surah: completedRange?.startSurahNumber || null,
-			memorized_start_verse: completedRange?.startVerseNumber || null,
-			memorized_end_surah: completedRange?.endSurahNumber || null,
-			memorized_end_verse: completedRange?.endVerseNumber || null,
+			memorized_ranges: nextRanges.length > 0 ? nextRanges : null,
+			memorized_start_surah: legacyFields.prev_start_surah,
+			memorized_start_verse: legacyFields.prev_start_verse,
+			memorized_end_surah: legacyFields.prev_end_surah,
+			memorized_end_verse: legacyFields.prev_end_verse,
 		})
 		.eq("id", student.id)
 

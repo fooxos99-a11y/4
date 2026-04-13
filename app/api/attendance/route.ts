@@ -8,8 +8,10 @@ import {
   calculateEvaluationLevelPoints,
   calculateTotalEvaluationPoints,
   isEvaluatedAttendance,
+  isPassingMemorizationLevel,
   isNonEvaluatedAttendance,
 } from "@/lib/student-attendance"
+import { getLegacyPreviousMemorizationFields, getStoredMemorizedRanges, SURAHS, subtractMemorizedRangeFromRanges } from "@/lib/quran-data"
 import { getOrCreateActiveSemester, isNoActiveSemesterError } from "@/lib/semesters"
 
 function getKsaDateString() {
@@ -39,6 +41,48 @@ function hasCompleteEvaluation(levels: {
     levels.samaa_level &&
     levels.rabet_level
   )
+}
+
+function resolveSurahNumber(value: unknown) {
+  const trimmedValue = String(value || "").trim()
+  if (!trimmedValue) return null
+
+  const numericValue = Number(trimmedValue)
+  if (Number.isInteger(numericValue) && numericValue >= 1 && numericValue <= 114) {
+    return numericValue
+  }
+
+  return SURAHS.find((surah) => surah.name === trimmedValue)?.number || null
+}
+
+function getPassingEvaluationMemorizationRange(evaluation: {
+  hafiz_level?: string | null
+  hafiz_from_surah?: string | null
+  hafiz_from_verse?: string | number | null
+  hafiz_to_surah?: string | null
+  hafiz_to_verse?: string | number | null
+}) {
+  if (!isPassingMemorizationLevel(evaluation.hafiz_level as any)) {
+    return null
+  }
+
+  const startSurahNumber = resolveSurahNumber(evaluation.hafiz_from_surah)
+  const startVerseNumber = Number(evaluation.hafiz_from_verse) || 1
+  const endSurahNumber = resolveSurahNumber(evaluation.hafiz_to_surah)
+  const endVerseNumber = Number(evaluation.hafiz_to_verse)
+
+  if (!startSurahNumber || !endSurahNumber || !Number.isInteger(startVerseNumber) || !Number.isInteger(endVerseNumber)) {
+    return null
+  }
+
+  return getStoredMemorizedRanges({
+    memorized_ranges: [{
+      startSurahNumber,
+      startVerseNumber,
+      endSurahNumber,
+      endVerseNumber,
+    }],
+  })[0] || null
 }
 
 export async function GET(request: NextRequest) {
@@ -256,17 +300,19 @@ export async function POST(request: NextRequest) {
     const isUpdate = !!existingRecord
     let previousPoints = 0
     const previousStatus = existingRecord?.status ?? null
+    let previousMemorizationRange: ReturnType<typeof getPassingEvaluationMemorizationRange> = null
 
     if (existingRecord) {
       console.log("[v0] Attendance already exists for student today, updating record:", existingRecord.id)
 
       const { data: oldEvaluation } = await supabase
         .from("evaluations")
-        .select("hafiz_level, tikrar_level, samaa_level, rabet_level")
+        .select("hafiz_level, tikrar_level, samaa_level, rabet_level, hafiz_from_surah, hafiz_from_verse, hafiz_to_surah, hafiz_to_verse")
         .eq("attendance_record_id", existingRecord.id)
         .maybeSingle()
 
       if (oldEvaluation) {
+        previousMemorizationRange = getPassingEvaluationMemorizationRange(oldEvaluation)
         previousPoints = applyAttendancePointsAdjustment(
           calculateTotalEvaluationPoints({
             hafiz_level: oldEvaluation.hafiz_level,
@@ -441,38 +487,70 @@ export async function POST(request: NextRequest) {
 
       console.log("[v0] Evaluation created:", evaluation.id)
 
-      if (totalPoints > 0) {
+      const evaluationMemorizationRange = getPassingEvaluationMemorizationRange({
+        hafiz_level,
+        hafiz_from_surah,
+        hafiz_from_verse,
+        hafiz_to_surah,
+        hafiz_to_verse,
+      })
+
+      if (totalPoints > 0 || evaluationMemorizationRange) {
         const { data: studentData, error: fetchError } = await supabase
           .from("students")
-          .select("points, store_points")
+          .select("points, store_points, memorized_start_surah, memorized_start_verse, memorized_end_surah, memorized_end_verse, memorized_ranges")
           .eq("id", student_id)
           .single()
 
         if (fetchError) {
-          console.error("[v0] Error fetching student points:", fetchError)
+          console.error("[v0] Error fetching student state:", fetchError)
         } else {
-          const currentPoints = studentData.points || 0
-          const currentStorePoints = studentData.store_points || 0
-          const newPoints = currentPoints + totalPoints
-          const newStorePoints = currentStorePoints + totalPoints
+          const updatePayload: Record<string, unknown> = {}
 
-          console.log("[v0] Updating student points and store_points:", {
-            currentPoints,
-            currentStorePoints,
-            addedPoints: totalPoints,
-            newPoints,
-            newStorePoints,
-          })
+          if (totalPoints > 0) {
+            const currentPoints = studentData.points || 0
+            const currentStorePoints = studentData.store_points || 0
+            const newPoints = currentPoints + totalPoints
+            const newStorePoints = currentStorePoints + totalPoints
+
+            console.log("[v0] Updating student points and store_points:", {
+              currentPoints,
+              currentStorePoints,
+              addedPoints: totalPoints,
+              newPoints,
+              newStorePoints,
+            })
+
+            updatePayload.points = newPoints
+            updatePayload.store_points = newStorePoints
+          }
+
+          if (evaluationMemorizationRange || previousMemorizationRange) {
+            const currentRanges = getStoredMemorizedRanges(studentData)
+            const baseRanges = previousMemorizationRange
+              ? subtractMemorizedRangeFromRanges(currentRanges, previousMemorizationRange)
+              : currentRanges
+            const nextRanges = evaluationMemorizationRange
+              ? getStoredMemorizedRanges({ memorized_ranges: [...baseRanges, evaluationMemorizationRange] })
+              : baseRanges
+            const legacyFields = getLegacyPreviousMemorizationFields(nextRanges)
+
+            updatePayload.memorized_start_surah = legacyFields.prev_start_surah
+            updatePayload.memorized_start_verse = legacyFields.prev_start_verse
+            updatePayload.memorized_end_surah = legacyFields.prev_end_surah
+            updatePayload.memorized_end_verse = legacyFields.prev_end_verse
+            updatePayload.memorized_ranges = nextRanges.length > 0 ? nextRanges : null
+          }
 
           const { error: updateError } = await supabase
             .from("students")
-            .update({ points: newPoints, store_points: newStorePoints })
+            .update(updatePayload)
             .eq("id", student_id)
 
           if (updateError) {
-            console.error("[v0] Error updating student points/store_points:", updateError)
-          } else {
-            console.log("[v0] Student points and store_points updated successfully to:", newPoints, newStorePoints)
+            console.error("[v0] Error updating student points/memorization:", updateError)
+          } else if (totalPoints > 0) {
+            console.log("[v0] Student points and store_points updated successfully")
           }
         }
       }

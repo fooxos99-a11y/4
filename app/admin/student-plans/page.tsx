@@ -1164,26 +1164,6 @@ export default function StudentPlansPage() {
       )
     ));
   };
-  const currentPlanSelectionRange = startNum && endNum
-    ? {
-        startSurahNumber: startNum,
-        startVerseNumber: startVerse ? parseInt(startVerse, 10) : 1,
-        endSurahNumber: endNum,
-        endVerseNumber: endVerse ? parseInt(endVerse, 10) : (SURAHS.find((surah) => surah.number === endNum)?.verseCount || 1),
-      }
-    : null;
-  const isAyahWithinCurrentPlanSelection = (surahNumber: number, verseNumber: number) => {
-    if (!currentPlanSelectionRange) return true;
-
-    return isAyahWithinRange(
-      surahNumber,
-      verseNumber,
-      currentPlanSelectionRange.startSurahNumber,
-      currentPlanSelectionRange.startVerseNumber,
-      currentPlanSelectionRange.endSurahNumber,
-      currentPlanSelectionRange.endVerseNumber,
-    );
-  };
   const getAvailableVerseNumbers = (surahNumber: number, minVerse: number, maxVerse: number) => {
     if (maxVerse < minVerse) return [];
 
@@ -1229,7 +1209,6 @@ export default function StudentPlansPage() {
     const otherRanges = normalizePreviousMemorizationRanges(getDraftPreviousRanges(previousRanges.filter((item) => item.id !== range.id)));
 
     return Array.from({ length: selectedSurah.verseCount }, (_, index) => index + 1)
-      .filter((verseNumber) => isAyahWithinCurrentPlanSelection(selectedSurah.number, verseNumber))
       .filter((verseNumber) => !otherRanges.some((otherRange) => (
         isAyahWithinRange(
           selectedSurah.number,
@@ -1258,7 +1237,6 @@ export default function StudentPlansPage() {
     }
 
     return Array.from({ length: Math.max(0, maxVerse - minVerse + 1) }, (_, index) => minVerse + index)
-      .filter((verseNumber) => isAyahWithinCurrentPlanSelection(selectedSurah.number, verseNumber))
       .filter((verseNumber) => !otherRanges.some((otherRange) => (
         isAyahWithinRange(
           selectedSurah.number,

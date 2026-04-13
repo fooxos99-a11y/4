@@ -278,7 +278,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    let plansQuery = supabase.from("student_plans").select("id, student_id, start_date, created_at, daily_pages, muraajaa_pages, rabt_pages, has_previous, prev_start_surah, prev_start_verse, prev_end_surah, prev_end_verse")
+    let plansQuery = supabase.from("student_plans").select("id, student_id, start_date, created_at, daily_pages, muraajaa_pages, rabt_pages, has_previous, prev_start_surah, prev_start_verse, prev_end_surah, prev_end_verse, previous_memorization_ranges")
     if (activeSemesterId) {
       plansQuery = plansQuery.eq("semester_id", activeSemesterId)
     }
@@ -343,6 +343,7 @@ export async function GET(request: NextRequest) {
     const circleStats = new Map<string, CircleSummary>()
     const dailyReportsByStudentDate = new Map<string, DailyReportRow>()
     const memorizedPoolByStudent = new Map<string, number>()
+    const activePlanIdByStudent = new Map<string, string>()
     const reviewCompletedByStudent = new Map<string, number>()
 
     for (const report of dailyReports) {
@@ -396,12 +397,15 @@ export async function GET(request: NextRequest) {
       const isPresent = status === "present" || status === "late"
       const dailyReport = dailyReportsByStudentDate.get(`${studentId}|${record.date}`)
       const { reviewDone, linkingDone } = getDailyCompletionFlags(record, dailyReport)
-      const memorizedPoolPages = memorizedPoolByStudent.has(studentId)
-        ? (memorizedPoolByStudent.get(studentId) ?? 0)
-        : calculatePreviousMemorizedPages(plan)
+      const activePlanId = activePlanIdByStudent.get(studentId)
+      const nextPlanBasePages = calculatePreviousMemorizedPages(plan)
+      const memorizedPoolPages = !memorizedPoolByStudent.has(studentId) || activePlanId !== plan.id
+        ? Math.max(memorizedPoolByStudent.get(studentId) ?? 0, nextPlanBasePages)
+        : (memorizedPoolByStudent.get(studentId) ?? 0)
+      activePlanIdByStudent.set(studentId, plan.id)
       const reviewPoolPages = resolvePlanReviewPoolPages(plan, memorizedPoolPages)
       const reviewPages = resolvePlanReviewPagesForDate(plan, reviewPoolPages, reviewCompletedByStudent.get(studentId) ?? 0, record.date)
-      const tiePages = Math.min(Number(plan?.rabt_pages ?? 0), Math.max(0, memorizedPoolPages))
+      const tiePages = Math.min(Number(plan?.rabt_pages ?? 10), Math.max(0, memorizedPoolPages))
 
       studentSummary.maxPoints += MAX_EVALUATION_POINTS_PER_STUDY_DAY
       circleSummary.totalRecords += 1

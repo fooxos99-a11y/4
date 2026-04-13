@@ -217,7 +217,7 @@ export default function AllCirclesPage() {
 
             <div className="relative inline-block">
               <div className="absolute inset-0 bg-[#3453a7]/5 blur-3xl rounded-full" />
-              <h1 className="relative text-3xl md:text-5xl lg:text-6xl font-bold text-[#20335f] px-4 md:px-6 py-2 leading-tight">
+              <h1 className="relative text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold text-[#20335f] px-3 sm:px-4 md:px-6 py-2 leading-tight">
                 أفضل الحلقات
               </h1>
             </div>
@@ -256,8 +256,8 @@ export default function AllCirclesPage() {
                         }}
                       />
 
-                      <div className="relative z-10 flex items-center gap-3 p-3 sm:gap-4 sm:p-4 md:grid md:grid-cols-[84px_minmax(0,1fr)_132px] md:items-center md:gap-5 md:p-6">
-                        <div className="flex shrink-0 items-center justify-center md:justify-start">
+                      <div className="relative z-10 grid grid-cols-[44px_minmax(0,1fr)_76px] items-center gap-x-2 p-3 sm:grid-cols-[56px_minmax(0,1fr)_88px] sm:gap-4 sm:p-4 md:grid-cols-[84px_minmax(0,1fr)_132px] md:gap-5 md:p-6">
+                        <div className="flex shrink-0 items-center justify-center sm:justify-start">
                           <div className="leaderboard-rank-bob mt-4 md:mt-5">
                             <div
                               className="relative flex h-11 w-11 items-center justify-center rounded-full border shadow-[0_12px_28px_-18px_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:scale-105 md:h-16 md:w-16"
@@ -276,17 +276,17 @@ export default function AllCirclesPage() {
                           </div>
                         </div>
 
-                        <div className="min-w-0 flex-1 text-right">
+                        <div className="min-w-0 text-right">
                           <div className="flex min-h-[40px] items-center justify-start md:min-h-[58px]">
-                            <h3 className="truncate text-base font-black tracking-tight text-[#20335f] transition-colors duration-300 group-hover:text-[#3453a7] sm:text-lg md:text-3xl md:text-right">
+                            <h3 className="truncate text-sm font-black tracking-tight text-[#20335f] transition-colors duration-300 group-hover:text-[#3453a7] sm:text-lg md:text-3xl md:text-right">
                               {circle.name}
                             </h3>
                           </div>
                         </div>
 
-                        <div className="flex shrink-0 justify-end md:justify-end">
+                        <div className="flex shrink-0 justify-end">
                           <div
-                            className="min-w-[76px] rounded-[18px] border bg-white/90 px-3 py-2 text-center shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)] backdrop-blur sm:min-w-[88px] sm:px-3.5 sm:py-2.5 md:min-w-[104px] md:rounded-[22px] md:px-4 md:py-3"
+                            className="min-w-[76px] rounded-[18px] border bg-white/90 px-2.5 py-2 text-center shadow-[0_18px_40px_-24px_rgba(0,0,0,0.35)] backdrop-blur sm:min-w-[88px] sm:px-3.5 sm:py-2.5 md:min-w-[104px] md:rounded-[22px] md:px-4 md:py-3"
                             style={{ borderColor: `${themeColors.primary}88` }}
                           >
                             <div className="text-lg font-black leading-none text-[#20335f] sm:text-xl md:text-3xl">
