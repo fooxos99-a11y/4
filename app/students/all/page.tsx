@@ -175,12 +175,12 @@ const getThemeColors = (preferredTheme?: string) => {
 
 const getFontFamily = (fontId?: string) => {
   const fontMap: Record<string, string> = {
-    font_cairo: "'Cairo', sans-serif",
-    font_amiri: "'Amiri', serif",
-    font_tajawal: "'Tajawal', sans-serif",
-    font_changa: "'Changa', sans-serif",
+    font_cairo: "'Cairo', 'Tajawal', sans-serif",
+    font_amiri: "'Amiri', 'Cairo', serif",
+    font_tajawal: "'Tajawal', 'Cairo', sans-serif",
+    font_changa: "'Changa', 'Cairo', sans-serif",
   }
-  return fontId && fontMap[fontId] ? fontMap[fontId] : "inherit"
+  return fontId && fontMap[fontId] ? fontMap[fontId] : "'Cairo', 'Tajawal', sans-serif"
 }
 
 const getBadgeIcon = (studentId: string, studentBadges: Record<string, string>) => {
@@ -648,7 +648,7 @@ export default function AllStudentsPage() {
                           <div className="min-w-0 text-right">
                             <div className="flex items-center justify-start gap-1.5 sm:gap-2 md:gap-3">
                               <h3
-                                className="truncate text-sm font-black tracking-tight text-[#2b478f] transition-colors duration-300 group-hover:text-[#4f73d1] sm:text-lg md:text-3xl"
+                                className="truncate text-sm font-extrabold leading-[1.35] tracking-normal text-[#2b478f] antialiased transition-colors duration-300 group-hover:text-[#4f73d1] sm:text-lg md:text-[2rem]"
                                 style={{ fontFamily: getFontFamily(student.font_family) }}
                               >
                                 {student.name}

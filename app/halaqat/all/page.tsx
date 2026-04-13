@@ -278,7 +278,7 @@ export default function AllCirclesPage() {
 
                         <div className="min-w-0 text-right">
                           <div className="flex min-h-[40px] items-center justify-start md:min-h-[58px]">
-                            <h3 className="truncate text-sm font-black tracking-tight text-[#20335f] transition-colors duration-300 group-hover:text-[#3453a7] sm:text-lg md:text-3xl md:text-right">
+                            <h3 className="truncate text-sm font-extrabold leading-[1.35] tracking-normal text-[#20335f] antialiased transition-colors duration-300 group-hover:text-[#3453a7] sm:text-lg md:text-[2rem] md:text-right">
                               {circle.name}
                             </h3>
                           </div>
