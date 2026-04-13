@@ -649,7 +649,7 @@ export function GlobalTeachersDialog() {
           setAddDialogView("single")
         }
       }}>
-        <DialogContent className={addDialogView === "bulk" ? "sm:max-w-[760px] max-h-[90vh] rounded-2xl bg-white p-0 overflow-hidden" : "max-w-md rounded-2xl bg-white p-0 overflow-hidden"} dir="rtl" style={{ zIndex: 110 }}>
+        <DialogContent className={addDialogView === "bulk" ? "flex h-[92vh] w-[96vw] max-w-[1240px] flex-col rounded-2xl bg-white p-0 overflow-hidden" : "max-w-md rounded-2xl bg-white p-0 overflow-hidden"} dir="rtl" style={{ zIndex: 110 }}>
           <DialogHeader className="border-b border-[#3453a7]/30 bg-gradient-to-r from-[#3453a7]/8 to-transparent px-6 py-5">
             <DialogTitle className="relative w-full text-center text-lg font-bold text-[#1a2332]">
               <Plus className="absolute right-0 top-1/2 h-5 w-5 -translate-y-1/2 text-[#4f73d1]" />
@@ -712,21 +712,8 @@ export function GlobalTeachersDialog() {
             </>
           ) : (
             <>
-              <div className="space-y-4 overflow-y-auto px-6 py-5">
-                <div className="rounded-2xl border border-[#3453a7]/20 bg-[#fafcff] p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="space-y-1 text-right">
-                      <p className="text-sm font-bold text-[#1a2332]">رفع ملف إكسل</p>
-                      <p className="text-xs text-neutral-500">الأعمدة المدعومة: اسم المعلم، رقم الهوية، الحلقة.</p>
-                    </div>
-                    <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-[#3453a7]/40 bg-white px-4 py-2 text-sm font-semibold text-[#4f73d1] transition-colors hover:bg-[#3453a7]/10">
-                      <Upload className="h-4 w-4" />
-                      رفع إكسل
-                      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportTeachersFile} />
-                    </label>
-                  </div>
-                </div>
-                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+              <div className="flex-1 overflow-y-auto px-6 py-5">
+                <div className="space-y-3 pr-1">
                   {bulkTeachers.map((draft, index) => (
                     <div key={draft.id} className="rounded-2xl border border-[#3453a7]/20 bg-white p-4 shadow-sm">
                       <div className="mb-3 flex items-center justify-between gap-3">
@@ -736,7 +723,7 @@ export function GlobalTeachersDialog() {
                           حذف
                         </button>
                       </div>
-                      <div className="grid grid-cols-6 items-end gap-3">
+                      <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.45fr)_repeat(5,minmax(120px,1fr))]">
                         <div className="space-y-1.5">
                           <Label className="text-sm font-semibold text-[#1a2332]">اسم المعلم</Label>
                           <Input value={draft.name} onChange={(event) => updateBulkTeacher(draft.id, { name: event.target.value })} placeholder="الاسم الكامل" className="h-10 rounded-xl border-[#3453a7]/40 text-sm focus-visible:border-[#3453a7] focus-visible:ring-[#3453a7]/30" />
@@ -778,16 +765,25 @@ export function GlobalTeachersDialog() {
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={addBulkTeacherRow} className="flex items-center gap-2 text-sm font-medium text-[#4f73d1] transition-colors hover:text-[#3453a7]">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full border border-current">
-                    <Plus className="h-3.5 w-3.5" />
-                  </span>
-                  إضافة صف جديد
-                </button>
               </div>
-              <div className="flex gap-3 border-t border-[#3453a7]/25 px-6 py-4">
+              <div className="shrink-0 border-t border-[#3453a7]/25 bg-white px-6 py-4">
+                <div className="mb-4 flex flex-col items-start gap-3">
+                  <button type="button" onClick={addBulkTeacherRow} className="inline-flex items-center gap-2 text-sm font-medium text-[#4f73d1] transition-colors hover:text-[#3453a7]">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full border border-current">
+                      <Plus className="h-3.5 w-3.5" />
+                    </span>
+                    إضافة معلم
+                  </button>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#3453a7]/40 bg-white px-4 py-2 text-sm font-semibold text-[#4f73d1] transition-colors hover:bg-[#3453a7]/10">
+                    <Upload className="h-4 w-4" />
+                    رفع ملف إكسل
+                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportTeachersFile} />
+                  </label>
+                </div>
+                <div className="flex gap-3">
                 <Button onClick={handleBulkAddTeachers} disabled={isSavingBulk} className="h-10 flex-1 rounded-lg border-none bg-[#3453a7] text-white hover:bg-[#24428f] disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">{isSavingBulk ? "جاري الحفظ..." : "حفظ"}</Button>
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="h-10 rounded-xl border-[#3453a7]/40 text-neutral-600">إلغاء</Button>
+                </div>
               </div>
             </>
           )}
