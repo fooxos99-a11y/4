@@ -3,6 +3,10 @@ CREATE TABLE IF NOT EXISTS whatsapp_messages (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   phone_number TEXT NOT NULL,
   message_text TEXT NOT NULL,
+  message_type TEXT NOT NULL DEFAULT 'text',
+  media_mime_type TEXT,
+  media_base64 TEXT,
+  media_file_name TEXT,
   status TEXT DEFAULT 'pending', -- pending, sent, delivered, read, failed
   message_id TEXT, -- WhatsApp message ID
   error_message TEXT,
@@ -27,6 +31,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_replies (
 -- فهرس للبحث السريع
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_phone ON whatsapp_messages(phone_number);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_status ON whatsapp_messages(status);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_type ON whatsapp_messages(message_type);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_replies_phone ON whatsapp_replies(from_phone);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_replies_read ON whatsapp_replies(is_read);
 

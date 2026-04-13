@@ -17,6 +17,9 @@ interface Reply {
   id: string
   student_name: string
   sent_message_text: string
+  sent_message_type?: string | null
+  sent_media_mime_type?: string | null
+  sent_media_base64?: string | null
   reply_message_text: string
   reply_type?: string | null
   media_mime_type?: string | null
@@ -24,12 +27,12 @@ interface Reply {
   is_read: boolean
 }
 
-function buildReplyAudioSrc(reply: Reply) {
-  if (!reply.media_base64 || !reply.media_mime_type) {
+function buildMediaSrc(base64: string | null | undefined, mimeType: string | null | undefined) {
+  if (!base64 || !mimeType) {
     return null
   }
 
-  return `data:${reply.media_mime_type};base64,${reply.media_base64}`
+  return `data:${mimeType};base64,${base64}`
 }
 
 export default function WhatsAppRepliesPage() {
@@ -230,7 +233,8 @@ export default function WhatsAppRepliesPage() {
                 ) : (
                   filteredReplies.map((reply) => (
                     (() => {
-                      const replyAudioSrc = buildReplyAudioSrc(reply)
+                      const replyAudioSrc = buildMediaSrc(reply.media_base64, reply.media_mime_type)
+                      const sentImageSrc = buildMediaSrc(reply.sent_media_base64, reply.sent_media_mime_type)
 
                       return (
                     <div
@@ -278,7 +282,22 @@ export default function WhatsAppRepliesPage() {
                             <Send className="h-4 w-4" />
                             الرسالة المرسلة
                           </div>
-                          <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.sent_message_text}</p>
+                          {sentImageSrc ? (
+                            <div className="space-y-3">
+                              <img
+                                src={sentImageSrc}
+                                alt="الصورة المرسلة"
+                                className="h-48 w-full rounded-xl border border-[#3453a7]/15 object-cover"
+                              />
+                              {reply.sent_message_text ? (
+                                <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.sent_message_text}</p>
+                              ) : (
+                                <p className="text-sm leading-7 text-[#1a2332]">تم إرسال صورة بدون نص مرفق.</p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="whitespace-pre-wrap text-sm leading-7 text-[#1a2332]">{reply.sent_message_text}</p>
+                          )}
                         </div>
 
                         <div className="rounded-xl border border-[#3453a7]/20 bg-[#3453a7]/5 p-4">

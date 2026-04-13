@@ -2,6 +2,10 @@ CREATE TABLE IF NOT EXISTS whatsapp_queue (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   phone_number TEXT NOT NULL,
   message TEXT NOT NULL,
+  message_type TEXT NOT NULL DEFAULT 'text',
+  media_mime_type TEXT,
+  media_base64 TEXT,
+  media_file_name TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
   error_message TEXT,
   sent_at TIMESTAMP WITH TIME ZONE,
@@ -10,6 +14,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_queue (
 
 CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_status ON whatsapp_queue(status);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_created_at ON whatsapp_queue(created_at);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_queue_type ON whatsapp_queue(message_type);
 
 ALTER TABLE whatsapp_queue ENABLE ROW LEVEL SECURITY;
 

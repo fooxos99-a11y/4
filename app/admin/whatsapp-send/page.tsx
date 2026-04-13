@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState, type ChangeEvent } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -13,7 +13,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useWhatsAppStatus } from "@/hooks/use-whatsapp-status"
-import { MessageCircle, Send, Users, CheckCircle2, XCircle, Phone, CircleAlert } from "lucide-react"
+import { MessageCircle, Send, Users, CheckCircle2, XCircle, Phone, CircleAlert, ImagePlus, X } from "lucide-react"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { SiteLoader } from "@/components/ui/site-loader"
 import { formatGuardianPhoneForDisplay } from "@/lib/phone-number"
@@ -25,6 +25,16 @@ interface Student {
   account_number: number
   halaqah?: string | null
 }
+
+type OutgoingImagePayload = {
+  base64: string
+  mimeType: string
+  fileName: string
+  previewUrl: string
+}
+
+const OUTBOUND_IMAGE_MAX_SIZE_BYTES = 3 * 1024 * 1024
+const OUTBOUND_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
 
 const TEMPLATE_VARIABLES = [
   { token: "{name}", label: "اسم الطالب", sample: "أحمد محمد" },
@@ -47,6 +57,27 @@ function resolveMessageTemplate(template: string, student: Student) {
     (result, [token, value]) => result.replaceAll(token, value),
     template,
   )
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result)
+        return
+      }
+
+      reject(new Error("تعذر قراءة الصورة"))
+    }
+    reader.onerror = () => reject(new Error("تعذر قراءة الصورة"))
+    reader.readAsDataURL(file)
+  })
+}
+
+function extractBase64FromDataUrl(dataUrl: string) {
+  const separatorIndex = dataUrl.indexOf(",")
+  return separatorIndex >= 0 ? dataUrl.slice(separatorIndex + 1) : dataUrl
 }
 
 export default function WhatsAppSendPage() {
@@ -112,11 +143,66 @@ export default function WhatsAppSendPage() {
   const [selectedHalaqah, setSelectedHalaqah] = useState("all")
   const [isSending, setIsSending] = useState(false)
   const [sendResults, setSendResults] = useState<{ success: number; failed: number } | null>(null)
+  const [imagePayload, setImagePayload] = useState<OutgoingImagePayload | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const router = useRouter()
   const { toast } = useToast()
 
     // نص مخصص للإدراج السريع
     const [quickText, setQuickText] = useState("")
+
+  const clearImageSelection = () => {
+    setImagePayload(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const handleImageSelection = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    if (!OUTBOUND_IMAGE_MIME_TYPES.includes(file.type as (typeof OUTBOUND_IMAGE_MIME_TYPES)[number])) {
+      toast({
+        title: "نوع غير مدعوم",
+        description: "يمكن رفع صور JPG أو PNG أو WEBP فقط.",
+        variant: "destructive",
+      })
+      event.target.value = ""
+      return
+    }
+
+    if (file.size > OUTBOUND_IMAGE_MAX_SIZE_BYTES) {
+      toast({
+        title: "الصورة كبيرة جدًا",
+        description: "الحد الأقصى لحجم الصورة هو 3 ميجابايت.",
+        variant: "destructive",
+      })
+      event.target.value = ""
+      return
+    }
+
+    try {
+      const previewUrl = await readFileAsDataUrl(file)
+      setImagePayload({
+        base64: extractBase64FromDataUrl(previewUrl),
+        mimeType: file.type,
+        fileName: file.name,
+        previewUrl,
+      })
+    } catch (error) {
+      console.error("Error reading outbound image:", error)
+      toast({
+        title: "تعذر قراءة الصورة",
+        description: "حاول اختيار صورة أخرى أو أعد المحاولة.",
+        variant: "destructive",
+      })
+      event.target.value = ""
+    }
+  }
 
   useEffect(() => {
     const loggedIn = localStorage.getItem("isLoggedIn") === "true"
@@ -218,10 +304,10 @@ export default function WhatsAppSendPage() {
       return
     }
 
-    if (!message.trim()) {
+    if (!message.trim() && !imagePayload) {
       toast({
         title: "تنبيه",
-        description: "الرجاء كتابة نص الرسالة",
+        description: "الرجاء كتابة نص الرسالة أو إرفاق صورة",
         variant: "destructive",
       })
       return
@@ -238,6 +324,13 @@ export default function WhatsAppSendPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message,
+          media: imagePayload
+            ? {
+                mimeType: imagePayload.mimeType,
+                base64: imagePayload.base64,
+                fileName: imagePayload.fileName,
+              }
+            : null,
           recipients: selectedStudentsData.map((student) => ({
             phoneNumber: student.guardian_phone,
             message: resolveMessageTemplate(message, student),
@@ -265,6 +358,7 @@ export default function WhatsAppSendPage() {
 
       // إعادة تعيين النموذج
       setMessage("")
+      clearImageSelection()
       setSelectedStudents([])
       } else {
       toast({
@@ -423,12 +517,60 @@ export default function WhatsAppSendPage() {
                       </div>
                       <Textarea
                         id="message"
-                        placeholder="اكتب رسالتك هنا... ويمكنك استخدام {name} و {halaqah} وغيرها"
+                        placeholder="اكتب رسالتك هنا... ويمكنك استخدام {name} و {halaqah} وغيرها. عند إرفاق صورة سيُرسل هذا النص كتعليق عليها."
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         rows={8}
                         className="resize-none"
                       />
+                    </div>
+
+                    <div className="space-y-3 rounded-2xl border border-dashed border-[#3453a7]/25 bg-[#f8fbff] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <Label htmlFor="whatsapp-image" className="text-sm font-semibold text-[#1a2332]">إرفاق صورة</Label>
+                          <p className="mt-1 text-xs text-gray-500">الأنواع المدعومة: JPG و PNG و WEBP. الحد الأقصى 3 ميجابايت.</p>
+                        </div>
+                        {imagePayload ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={clearImageSelection}
+                            className="text-sm h-9 rounded-lg border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          >
+                            <X className="me-1.5 h-4 w-4" />
+                            إزالة الصورة
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      <input
+                        ref={fileInputRef}
+                        id="whatsapp-image"
+                        type="file"
+                        accept={OUTBOUND_IMAGE_MIME_TYPES.join(",")}
+                        onChange={handleImageSelection}
+                        className="block w-full cursor-pointer rounded-xl border border-[#3453a7]/15 bg-white px-3 py-2 text-sm text-[#1a2332] file:me-3 file:rounded-lg file:border-0 file:bg-[#3453a7] file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-[#274187]"
+                      />
+
+                      {imagePayload ? (
+                        <div className="overflow-hidden rounded-2xl border border-[#3453a7]/15 bg-white">
+                          <img
+                            src={imagePayload.previewUrl}
+                            alt="معاينة الصورة"
+                            className="h-56 w-full object-cover"
+                          />
+                          <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                            <div>
+                              <p className="font-semibold text-[#1a2332]">{imagePayload.fileName}</p>
+                              <p className="text-xs text-gray-500">سيتم إرسال الصورة إلى أولياء الأمور المحددين.</p>
+                            </div>
+                            <div className="rounded-full bg-[#3453a7]/10 p-2 text-[#3453a7]">
+                              <ImagePlus className="h-4 w-4" />
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
 
                     {sendResults && (
@@ -449,7 +591,7 @@ export default function WhatsAppSendPage() {
 
                     <Button
                       onClick={handleSendMessages}
-                      disabled={isSending || isWhatsAppStatusLoading || !isWhatsAppReady || selectedStudents.length === 0 || !message.trim()}
+                      disabled={isSending || isWhatsAppStatusLoading || !isWhatsAppReady || selectedStudents.length === 0 || (!message.trim() && !imagePayload)}
                       variant="outline"
                       className="w-full text-sm h-9 rounded-lg border-[#3453a7]/50 bg-[linear-gradient(135deg,#24428f_0%,#3453a7_55%,#4f73d1_100%)] !text-white hover:brightness-105 hover:!text-white focus-visible:!text-white active:!text-white disabled:!text-white disabled:opacity-60"
                     >

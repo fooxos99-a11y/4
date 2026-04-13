@@ -9,7 +9,7 @@ const path = require("path")
 const { spawn } = require("child_process")
 const qrcode = require("qrcode-terminal")
 const QRCode = require("qrcode")
-const { Client, LocalAuth } = require("whatsapp-web.js")
+const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js")
 const { createClient } = require("@supabase/supabase-js")
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -184,6 +184,23 @@ function normalizePhoneNumber(phoneNumber) {
 
 function toChatId(phoneNumber) {
   return `${normalizePhoneNumber(phoneNumber)}@c.us`
+}
+
+function buildOutgoingMedia(row) {
+  const messageType = String(row?.message_type || "text").trim().toLowerCase()
+  if (messageType !== "image") {
+    return null
+  }
+
+  const mimeType = String(row?.media_mime_type || "").trim().toLowerCase()
+  const mediaBase64 = String(row?.media_base64 || "").trim().replace(/\s+/g, "")
+  const fileName = String(row?.media_file_name || "").trim() || undefined
+
+  if (!mimeType || !mediaBase64) {
+    throw new Error(`Outgoing image payload for message ${row?.id || "unknown"} is incomplete.`)
+  }
+
+  return new MessageMedia(mimeType, mediaBase64, fileName)
 }
 
 function extractWhatsAppMessageId(message) {
@@ -925,9 +942,13 @@ async function processQueue() {
       }
 
       const chatId = phoneInfo._serialized
+      const outgoingMedia = buildOutgoingMedia(row)
+      const trimmedMessage = String(row.message || "").trim()
 
       log(`Sending message ${row.id} to ${chatId}`)
-      const sentMessage = await whatsappClient.sendMessage(chatId, row.message)
+      const sentMessage = outgoingMedia
+        ? await whatsappClient.sendMessage(chatId, outgoingMedia, trimmedMessage ? { caption: trimmedMessage } : undefined)
+        : await whatsappClient.sendMessage(chatId, trimmedMessage)
       await updateSentMessageMetadata(row.id, extractWhatsAppMessageId(sentMessage))
       await updateQueueStatus(row.id, "sent")
       sentMessagesSincePause += 1
@@ -962,7 +983,7 @@ async function processQueue() {
 async function loadPendingMessages() {
   const { data, error } = await supabase
     .from(QUEUE_TABLE)
-    .select("id, phone_number, message, status")
+    .select("id, phone_number, message, message_type, media_mime_type, media_base64, media_file_name, status")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
 

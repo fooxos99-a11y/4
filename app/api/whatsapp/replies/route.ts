@@ -20,6 +20,9 @@ type WhatsAppMessageRow = {
   id: string
   phone_number: string
   message_text: string
+  message_type?: string | null
+  media_mime_type?: string | null
+  media_base64?: string | null
   created_at: string | null
 }
 
@@ -152,16 +155,31 @@ export async function GET(request: Request) {
     const replyRows = (replies || []) as WhatsAppReplyRow[]
     const replyPhones = Array.from(new Set(replyRows.map((reply) => normalizePhoneForMatching(reply.from_phone)).filter(Boolean))) as string[]
 
-    const [{ data: students, error: studentsError }, { data: messages, error: messagesError }] = await Promise.all([
+    const buildMessagesQuery = (selectClause: string) => {
+      if (replyPhones.length === 0) {
+        return Promise.resolve({ data: [], error: null })
+      }
+
+      return supabase
+        .from("whatsapp_messages")
+        .select(selectClause)
+        .in("phone_number", replyPhones)
+        .order("created_at", { ascending: false })
+    }
+
+    const [{ data: students, error: studentsError }, messagesResult] = await Promise.all([
       supabase.from("students").select("id, name, guardian_phone"),
-      replyPhones.length > 0
-        ? supabase
-            .from("whatsapp_messages")
-            .select("id, phone_number, message_text, created_at")
-            .in("phone_number", replyPhones)
-            .order("created_at", { ascending: false })
-        : Promise.resolve({ data: [], error: null }),
+      buildMessagesQuery("id, phone_number, message_text, message_type, media_mime_type, media_base64, created_at"),
     ])
+
+    let messages = messagesResult.data
+    let messagesError = messagesResult.error
+
+    if (messagesError && (messagesError.code === "42703" || messagesError.code === "PGRST204")) {
+      const legacyMessagesResult = await buildMessagesQuery("id, phone_number, message_text, created_at")
+      messages = legacyMessagesResult.data
+      messagesError = legacyMessagesResult.error
+    }
 
     if (studentsError) {
       console.error("[WhatsApp] Error fetching students for replies:", studentsError)
@@ -236,6 +254,9 @@ export async function GET(request: Request) {
           student_id: student?.id || null,
           student_name: student?.name || "غير معروف",
           sent_message_text: originalMessage.message_text,
+          sent_message_type: originalMessage.message_type || "text",
+          sent_media_mime_type: originalMessage.media_mime_type || null,
+          sent_media_base64: originalMessage.media_base64 || null,
           reply_message_text: reply.message_text,
           reply_type: reply.reply_type || "text",
           media_mime_type: reply.media_mime_type || null,
