@@ -1176,18 +1176,6 @@ export default function AdminExamsPage() {
                     </div>
 
                     <div className="rounded-[30px] border border-[#dbe5f1] bg-[#fcfdff] p-5 shadow-[0_16px_45px_rgba(15,23,42,0.06)] sm:p-6">
-                      <div className="mb-5 flex flex-col gap-2 text-right sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="text-2xl font-black text-[#1a2332]">اختبار الطالب</div>
-                          <div className="text-sm font-bold text-[#64748b]">
-                            {selectedStudent ? `الطالب المحدد حالياً: ${selectedStudent.name}` : "اختر الحلقة والطالب ثم سجّل نتيجة الاختبار."}
-                          </div>
-                        </div>
-                        <div className="rounded-2xl bg-[#eef4ff] px-4 py-2 text-sm font-black text-[#3453a7]">
-                          النتيجة المتوقعة: {scorePreview.finalScore} / {settingsPreview.maxScore}
-                        </div>
-                      </div>
-
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2 text-right">
                           <Label className="text-sm font-black text-[#334155]">اسم المختبر</Label>
