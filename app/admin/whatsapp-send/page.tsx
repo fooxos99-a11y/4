@@ -517,7 +517,7 @@ export default function WhatsAppSendPage() {
                       </div>
                       <Textarea
                         id="message"
-                        placeholder="اكتب رسالتك هنا... ويمكنك استخدام {name} و {halaqah} وغيرها. عند إرفاق صورة سيُرسل هذا النص كتعليق عليها."
+                        placeholder="اكتب رسالتك هنا...."
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         rows={8}
