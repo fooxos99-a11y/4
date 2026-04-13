@@ -1,7 +1,7 @@
+import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { isPrivilegedRole, requireRoles } from "@/lib/auth/guards"
-import { normalizeGuardianPhoneForStorage } from "@/lib/phone-number"
 
 function getErrorMessage(error: unknown) {
   if (!error) return "حدث خطأ غير معروف"
@@ -10,35 +10,8 @@ function getErrorMessage(error: unknown) {
     const candidate = error as { message?: string; details?: string; hint?: string; code?: string }
     return candidate.message || candidate.details || candidate.hint || candidate.code || JSON.stringify(candidate)
   }
+
   return String(error)
-}
-
-function normalizeTeacherPhone(phoneNumber: unknown) {
-  if (phoneNumber === undefined) return undefined
-  if (phoneNumber === null) return null
-
-  const trimmedPhone = String(phoneNumber).trim()
-  if (!trimmedPhone) return null
-
-  return normalizeGuardianPhoneForStorage(trimmedPhone)
-}
-
-function mapTeacherWriteError(error: unknown) {
-  const message = getErrorMessage(error)
-
-  if (/account_number/i.test(message) && /duplicate|unique/i.test(message)) {
-    return "رقم الحساب موجود بالفعل"
-  }
-
-  if (/id_number/i.test(message) && /duplicate|unique/i.test(message)) {
-    return "رقم الهوية موجود بالفعل"
-  }
-
-  if (/phone_number/i.test(message) && /invalid|phone/i.test(message)) {
-    return "رقم الجوال غير صالح"
-  }
-
-  return message
 }
 
 export async function GET(request: Request) {
@@ -49,7 +22,7 @@ export async function GET(request: Request) {
     }
 
     const { session } = auth
-    const supabase = createAdminClient()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const accountNumber = searchParams.get("account_number")
 
@@ -157,22 +130,15 @@ export async function POST(request: Request) {
       return auth.response
     }
 
-    const supabase = createAdminClient()
+    const supabase = await createClient()
     const body = await request.json()
-    const { name, id_number, account_number, halaqah, role, phone_number } = body
+    const { name, id_number, account_number, halaqah, role } = body
 
     if (!name || !id_number || !account_number || !halaqah) {
       return NextResponse.json({ error: "جميع الحقول مطلوبة" }, { status: 400 })
     }
 
     const assignedRole = role === "deputy_teacher" ? "deputy_teacher" : "teacher"
-    let normalizedPhoneNumber: string | null | undefined
-
-    try {
-      normalizedPhoneNumber = normalizeTeacherPhone(phone_number)
-    } catch {
-      return NextResponse.json({ error: "رقم الجوال غير صالح" }, { status: 400 })
-    }
 
     const { data: existingUser } = await supabase
       .from("users")
@@ -193,7 +159,6 @@ export async function POST(request: Request) {
           role: assignedRole,
           halaqah,
           account_number: Number.parseInt(account_number),
-          phone_number: normalizedPhoneNumber,
           password_hash: "",
         },
       ])
@@ -202,7 +167,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("[v0] Error adding teacher:", error)
-      return NextResponse.json({ error: mapTeacherWriteError(error) }, { status: 500 })
+      return NextResponse.json({ error: "فشل في إضافة المعلم" }, { status: 500 })
     }
 
     return NextResponse.json(
@@ -215,7 +180,6 @@ export async function POST(request: Request) {
           idNumber: data.id_number || "",
           halaqah: data.halaqah || "",
           studentCount: 0,
-          phoneNumber: data.phone_number || "",
           role: data.role || "teacher",
         },
       },
@@ -236,23 +200,53 @@ export async function DELETE(request: Request) {
 
     const supabase = createAdminClient()
     const { searchParams } = new URL(request.url)
-    const teacherId = searchParams.get("id")
+    const teacherId = String(searchParams.get("id") || "").trim()
 
     if (!teacherId) {
       return NextResponse.json({ error: "معرف المعلم مطلوب" }, { status: 400 })
     }
 
-    const { error } = await supabase.from("users").delete().eq("id", teacherId).in("role", ["teacher", "deputy_teacher"])
+    const { data: teacher, error: teacherLookupError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", teacherId)
+      .in("role", ["teacher", "deputy_teacher"])
+      .maybeSingle()
+
+    if (teacherLookupError) {
+      console.error("[v0] Error finding teacher before removal:", teacherLookupError)
+      return NextResponse.json({ error: getErrorMessage(teacherLookupError) }, { status: 500 })
+    }
+
+    if (!teacher) {
+      return NextResponse.json({ error: "المعلم غير موجود" }, { status: 404 })
+    }
+
+    const { error: clearWhatsappMessagesError } = await supabase
+      .from("whatsapp_messages")
+      .update({ sent_by: null })
+      .eq("sent_by", teacherId)
+
+    if (clearWhatsappMessagesError && clearWhatsappMessagesError.code !== "42P01") {
+      console.error("[v0] Error clearing teacher WhatsApp references:", clearWhatsappMessagesError)
+      return NextResponse.json({ error: getErrorMessage(clearWhatsappMessagesError) }, { status: 500 })
+    }
+
+    const { error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", teacherId)
+      .in("role", ["teacher", "deputy_teacher"])
 
     if (error) {
       console.error("[v0] Error removing teacher:", error)
-      return NextResponse.json({ error: "فشل في إزالة المعلم" }, { status: 500 })
+      return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })
     }
 
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
     console.error("[v0] Error in DELETE /api/teachers:", error)
-    return NextResponse.json({ error: "حدث خطأ في الخادم" }, { status: 500 })
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })
   }
 }
 
@@ -263,7 +257,7 @@ export async function PATCH(request: Request) {
       return auth.response
     }
 
-    const supabase = createAdminClient()
+    const supabase = await createClient()
     const body = await request.json()
     const { id, name, phone_number, id_number, account_number, halaqah, role } = body
 
@@ -273,13 +267,7 @@ export async function PATCH(request: Request) {
 
     const updateData: any = {}
     if (name !== undefined) updateData.name = name
-    if (phone_number !== undefined) {
-      try {
-        updateData.phone_number = normalizeTeacherPhone(phone_number)
-      } catch {
-        return NextResponse.json({ error: "رقم الجوال غير صالح" }, { status: 400 })
-      }
-    }
+    if (phone_number !== undefined) updateData.phone_number = phone_number
     if (id_number !== undefined) updateData.id_number = id_number
     if (account_number !== undefined) updateData.account_number = account_number
     if (halaqah !== undefined) updateData.halaqah = halaqah
@@ -317,12 +305,12 @@ export async function PATCH(request: Request) {
 
     if (error) {
       console.error("[v0] Error updating teacher:", error)
-      return NextResponse.json({ error: mapTeacherWriteError(error) }, { status: 500 })
+      return NextResponse.json({ error: "فشل في تحديث المعلم" }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, teacher: data }, { status: 200 })
   } catch (error) {
     console.error("[v0] Error in PATCH /api/teachers:", error)
-    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })
+    return NextResponse.json({ error: "حدث خطأ في الخادم" }, { status: 500 })
   }
 }
