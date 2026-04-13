@@ -48,7 +48,6 @@ export default function TeacherManagement() {
   const [newTeacherName, setNewTeacherName] = useState("")
   const [newTeacherIdNumber, setNewTeacherIdNumber] = useState("")
   const [newTeacherAccountNumber, setNewTeacherAccountNumber] = useState("")
-  const [newTeacherPhoneNumber, setNewTeacherPhoneNumber] = useState("")
   const [selectedHalaqah, setSelectedHalaqah] = useState("")
   const [newTeacherRole, setNewTeacherRole] = useState<"teacher" | "deputy_teacher">("teacher")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -127,7 +126,6 @@ export default function TeacherManagement() {
             name: newTeacherName,
             id_number: newTeacherIdNumber,
             account_number: Number.parseInt(newTeacherAccountNumber),
-            phone_number: newTeacherPhoneNumber,
             halaqah: selectedHalaqah,
             role: newTeacherRole,
           }),
@@ -143,7 +141,6 @@ export default function TeacherManagement() {
           setNewTeacherName("")
           setNewTeacherIdNumber("")
           setNewTeacherAccountNumber("")
-          setNewTeacherPhoneNumber("")
           setSelectedHalaqah("")
           setNewTeacherRole("teacher")
           setIsAddDialogOpen(false)
@@ -176,7 +173,7 @@ export default function TeacherManagement() {
           setTeachers(teachers.filter((t) => t.id !== id))
           await showAlert(`تم إزالة المعلم ${name} بنجاح`, "نجاح")
         } else {
-          await showAlert("فشل في إزالة المعلم", "خطأ")
+          await showAlert(data?.error || "فشل في إزالة المعلم", "خطأ")
         }
       } catch (error) {
         console.error("[v0] Error removing teacher:", error)
@@ -282,10 +279,6 @@ export default function TeacherManagement() {
                     <Input id="teacherIdNumber" value={newTeacherIdNumber} onChange={(e) => setNewTeacherIdNumber(e.target.value)} placeholder="أدخل رقم الهوية" dir="ltr" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="teacherPhoneNumber" className="text-sm font-semibold text-[#1a2332]">رقم الجوال</Label>
-                    <Input id="teacherPhoneNumber" value={newTeacherPhoneNumber} onChange={(e) => setNewTeacherPhoneNumber(e.target.value)} placeholder="أدخل رقم الجوال" dir="ltr" />
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="halaqah" className="text-sm font-semibold text-[#1a2332]">اختر الحلقة</Label>
                     <Select value={selectedHalaqah} onValueChange={setSelectedHalaqah}>
                       <SelectTrigger><SelectValue placeholder="اختر الحلقة" /></SelectTrigger>
@@ -384,7 +377,7 @@ export default function TeacherManagement() {
                               {teacher.role === "deputy_teacher" ? "نائب معلم" : "معلم"}
                             </span>
                           </div>
-                          <p className="text-xs text-neutral-400 mt-0.5">{(teacher.halaqah || "بدون حلقة").trim() || "بدون حلقة"}</p>
+                          <p className="text-xs text-neutral-400 mt-0.5">{teacher.halaqah}</p>
                         </div>
                       </div>
 
