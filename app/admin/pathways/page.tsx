@@ -553,20 +553,14 @@ export default function AdminPathwaysPage() {
               </div>
               <h1 className="text-2xl font-bold text-[#1a2332]">إدارة المسار</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowNotificationTemplateModal(true)}
-                className="flex h-11 items-center gap-2 rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white transition-colors hover:bg-[#274187]"
-              >
-                <Bell className="w-4 h-4" />
+            <div className="flex flex-col items-stretch justify-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <Button type="button" onClick={() => setShowNotificationTemplateModal(true)} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
+                <Bell className="me-2 h-4 w-4" />
                 قالب التنبيه
-              </button>
-              <button
-                onClick={() => { loadLevelResults(); setShowResultsModal(true); }}
-                className="flex h-11 items-center gap-2 rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white transition-colors hover:bg-[#274187]"
-              >
+              </Button>
+              <Button type="button" onClick={() => { loadLevelResults(); setShowResultsModal(true); }} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] sm:w-auto">
                 نتائج المسار
-              </button>
+              </Button>
             </div>
           </div>
 
