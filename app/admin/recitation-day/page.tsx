@@ -1129,7 +1129,6 @@ export default function AdminRecitationDayPage() {
                 {editingStudent.portions.map((portion) => (
                   <div key={portion.id} className="space-y-4 rounded-[20px] border border-[#e6edf6] bg-white p-4">
                     <div className="space-y-1 text-right">
-                      <div className="text-sm font-bold text-[#1a2332]">الجزء</div>
                       <div className="rounded-2xl border border-[#edf2f7] bg-[#f9fbff] px-3 py-3">
                         <div className="text-sm font-black text-[#1a2332]">{getPortionJuzTitle(portion)}</div>
                         <div className="mt-1 text-xs text-[#526071]">{getPortionRangeText(portion)}</div>
@@ -1197,7 +1196,6 @@ export default function AdminRecitationDayPage() {
                 {detailsStudent.portions.map((portion) => (
                   <div key={portion.id} className="rounded-[24px] border border-[#e6edf6] bg-white p-4 shadow-sm">
                     <div className="space-y-2">
-                      <div className="text-sm font-bold text-[#1a2332]">الجزء</div>
                       <div className="rounded-2xl border border-[#edf2f7] bg-[#f9fbff] px-3 py-3">
                         <div className="text-sm font-black text-[#1a2332]">{getPortionJuzTitle(portion)}</div>
                         <div className="mt-1 text-xs text-[#526071]">{getPortionRangeText(portion)}</div>
