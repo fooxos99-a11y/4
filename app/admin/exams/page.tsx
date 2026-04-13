@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,7 +17,7 @@ import { useAlertDialog } from "@/hooks/use-confirm-dialog"
 import { useWhatsAppStatus } from "@/hooks/use-whatsapp-status"
 import { calculateExamScore, normalizeExamSettings, type ExamSettings } from "@/lib/exam-settings"
 import { normalizeExamPortionSettings, type ExamPortionType } from "@/lib/exam-portion-settings"
-import { buildExamPortionRecordMap, getPassedPortionNumbers } from "@/lib/exam-portions"
+import { getPassedPortionNumbers } from "@/lib/exam-portions"
 import type { PreviousMemorizationRange } from "@/lib/quran-data"
 import { DEFAULT_EXAM_PORTION_SETTINGS, DEFAULT_EXAM_SETTINGS, EXAM_PORTION_SETTINGS_ID, EXAM_SETTINGS_ID } from "@/lib/site-settings-constants"
 import { formatExamPortionLabel, getEligibleExamJuzs, getEligibleExamPortions, type StudentExamPlanProgressSource } from "@/lib/student-exams"
@@ -208,28 +206,12 @@ function parseCount(value: string) {
   return Math.floor(parsed)
 }
 
-function normalizeStudentRelation(value: ExamRow["students"]) {
-  if (Array.isArray(value)) {
-    return value[0] || null
-  }
-
-  return value || null
-}
-
 function normalizeScheduleStudentRelation(value: ExamScheduleRow["students"]) {
   if (Array.isArray(value)) {
     return value[0] || null
   }
 
   return value || null
-}
-
-function getExamPortionDisplay(exam: Pick<ExamRow, "exam_portion_label" | "juz_number">) {
-  return exam.exam_portion_label || formatExamPortionLabel(exam.juz_number, "غير محدد")
-}
-
-function getStatusTone(passed: boolean) {
-  return passed ? "bg-[#ecfdf5] text-[#166534]" : "bg-[#fef2f2] text-[#b91c1c]"
 }
 
 function getScheduleStatusTone(status: ExamScheduleRow["status"]) {
@@ -286,9 +268,14 @@ export default function AdminExamsPage() {
   const [notificationTemplatesForm, setNotificationTemplatesForm] = useState<NotificationTemplatesForm>(DEFAULT_NOTIFICATION_TEMPLATES_FORM)
   const [portionMode, setPortionMode] = useState<ExamPortionType>(DEFAULT_EXAM_PORTION_SETTINGS.mode)
   const [selectedCircle, setSelectedCircle] = useState("")
+  const [examDialogCircle, setExamDialogCircle] = useState("")
   const [form, setForm] = useState<ExamFormState>(DEFAULT_FORM)
   const [scheduleDrafts, setScheduleDrafts] = useState<Record<string, ScheduleExamForm>>({})
   const [studentPlanProgressMap, setStudentPlanProgressMap] = useState<Record<string, StudentPlanProgressState>>({})
+  const [examDialogStudents, setExamDialogStudents] = useState<Student[]>([])
+  const [examDialogExams, setExamDialogExams] = useState<ExamRow[]>([])
+  const [examDialogPlanProgressMap, setExamDialogPlanProgressMap] = useState<Record<string, StudentPlanProgressState>>({})
+  const [isExamDialogLoading, setIsExamDialogLoading] = useState(false)
   const [isSavingTemplates, setIsSavingTemplates] = useState(false)
   const [overviewCircleFilter, setOverviewCircleFilter] = useState<string>(ALL_CIRCLES_VALUE)
   const [overviewDateFilter, setOverviewDateFilter] = useState(getTodayDate())
@@ -341,6 +328,14 @@ export default function AdminExamsPage() {
 
     void bootstrap()
   }, [authLoading, authVerified])
+
+  useEffect(() => {
+    if (!isExamDialogOpen) {
+      return
+    }
+
+    setExamDialogCircle((current) => current || selectedCircle)
+  }, [isExamDialogOpen, selectedCircle])
 
   useEffect(() => {
     async function loadStudentsAndExams() {
@@ -396,7 +391,64 @@ export default function AdminExamsPage() {
         setSchedulesTableMissing(Boolean(schedulesData.tableMissing))
         setTableMissing(Boolean(examsData.tableMissing))
         setStudentPlanProgressMap(Object.fromEntries(planEntries))
+      } catch (error) {
+        console.error("[admin-exams] load:", error)
+      } finally {
+        setIsCircleDataLoading(false)
+      }
+    }
 
+    void loadStudentsAndExams()
+  }, [authLoading, authVerified, selectedCircle])
+
+  useEffect(() => {
+    async function loadExamDialogData() {
+      if (authLoading || !authVerified || !isExamDialogOpen) {
+        return
+      }
+
+      if (!examDialogCircle) {
+        setExamDialogStudents([])
+        setExamDialogExams([])
+        setExamDialogPlanProgressMap({})
+        setForm((current) => ({ ...current, studentId: "", selectedJuz: "", alertsCount: "0", mistakesCount: "0" }))
+        setIsExamDialogLoading(false)
+        return
+      }
+
+      try {
+        setIsExamDialogLoading(true)
+        const [studentsResponse, examsResponse] = await Promise.all([
+          fetch(`/api/students?circle=${encodeURIComponent(examDialogCircle)}`, { cache: "no-store" }),
+          fetch(`/api/exams?circle=${encodeURIComponent(examDialogCircle)}`, { cache: "no-store" }),
+        ])
+
+        if (!studentsResponse.ok || !examsResponse.ok) {
+          throw new Error("تعذر تحميل بيانات نافذة الاختبار")
+        }
+
+        const studentsData = await studentsResponse.json()
+        const examsData = await examsResponse.json()
+        const loadedStudents = (studentsData.students || []) as Student[]
+        const ids = loadedStudents.map((student) => student.id).join(",")
+        const batchPlanResponse = loadedStudents.length > 0
+          ? await fetch(`/api/student-plans?student_ids=${encodeURIComponent(ids)}`, { cache: "no-store" })
+          : null
+        const batchPlanData = batchPlanResponse && batchPlanResponse.ok
+          ? await batchPlanResponse.json()
+          : { plansByStudent: {} }
+        const planEntries = loadedStudents.map((student) => ([
+          student.id,
+          {
+            plan: (batchPlanData.plansByStudent?.[student.id]?.plan || null) as StudentExamPlanProgressSource | null,
+            completedDays: Number(batchPlanData.plansByStudent?.[student.id]?.completedDays) || 0,
+          },
+        ] as const))
+
+        setExamDialogStudents(loadedStudents)
+        setExamDialogExams((examsData.exams || []) as ExamRow[])
+        setExamDialogPlanProgressMap(Object.fromEntries(planEntries))
+        setTableMissing(Boolean(examsData.tableMissing))
         setForm((current) => {
           const nextStudentId = loadedStudents.some((student) => student.id === current.studentId)
             ? current.studentId
@@ -408,18 +460,22 @@ export default function AdminExamsPage() {
           }
         })
       } catch (error) {
-        console.error("[admin-exams] load:", error)
+        console.error("[admin-exams] load exam dialog:", error)
+        setExamDialogStudents([])
+        setExamDialogExams([])
+        setExamDialogPlanProgressMap({})
       } finally {
-        setIsCircleDataLoading(false)
+        setIsExamDialogLoading(false)
       }
     }
 
-    void loadStudentsAndExams()
-  }, [authLoading, authVerified, selectedCircle])
+    void loadExamDialogData()
+  }, [authLoading, authVerified, examDialogCircle, isExamDialogOpen])
 
   const settingsPreview = useMemo(() => fromSettingsForm(settingsForm), [settingsForm])
   const portionUnitLabel = portionMode === "hizb" ? "الحزب" : "الجزء"
   const filteredStudents = useMemo(() => students, [students])
+  const examDialogFilteredStudents = useMemo(() => examDialogStudents, [examDialogStudents])
   const activeSchedulesByStudentId = useMemo(() => {
     const grouped = new Map<string, ExamScheduleRow[]>()
 
@@ -435,18 +491,17 @@ export default function AdminExamsPage() {
 
     return grouped
   }, [examSchedules])
-  const selectedStudent = useMemo(() => filteredStudents.find((student) => student.id === form.studentId) || null, [filteredStudents, form.studentId])
+  const selectedStudent = useMemo(() => examDialogFilteredStudents.find((student) => student.id === form.studentId) || null, [examDialogFilteredStudents, form.studentId])
   const selectedStudentPlanProgress = useMemo(() => {
     if (!form.studentId) {
       return null
     }
 
-    return studentPlanProgressMap[form.studentId] || null
-  }, [studentPlanProgressMap, form.studentId])
-  const studentExams = useMemo(() => exams.filter((exam) => exam.student_id === form.studentId), [exams, form.studentId])
+    return examDialogPlanProgressMap[form.studentId] || null
+  }, [examDialogPlanProgressMap, form.studentId])
+  const studentExams = useMemo(() => examDialogExams.filter((exam) => exam.student_id === form.studentId), [examDialogExams, form.studentId])
   const eligiblePortions = useMemo(() => getEligibleExamPortions(selectedStudent, selectedStudentPlanProgress, portionMode), [selectedStudent, selectedStudentPlanProgress, portionMode])
   const eligiblePortionNumbers = useMemo(() => eligiblePortions.map((portion) => portion.portionNumber), [eligiblePortions])
-  const latestExamByPortion = useMemo(() => buildExamPortionRecordMap(studentExams, portionMode), [studentExams, portionMode])
   const passedPortionNumbers = useMemo(() => getPassedPortionNumbers(studentExams, portionMode), [studentExams, portionMode])
   const availablePortions = useMemo(() => eligiblePortions.filter((portion) => !passedPortionNumbers.has(portion.portionNumber)), [eligiblePortions, passedPortionNumbers])
   const availableJuzs = useMemo(() => availablePortions.map((portion) => portion.portionNumber), [availablePortions])
@@ -507,7 +562,7 @@ export default function AdminExamsPage() {
 
   useEffect(() => {
     setForm((current) => {
-      const nextStudentId = filteredStudents.some((student) => student.id === current.studentId)
+      const nextStudentId = examDialogFilteredStudents.some((student) => student.id === current.studentId)
         ? current.studentId
         : ""
 
@@ -523,7 +578,7 @@ export default function AdminExamsPage() {
         mistakesCount: "0",
       }
     })
-  }, [filteredStudents])
+  }, [examDialogFilteredStudents])
 
   const loadCircleSchedules = async (circleName: string) => {
     if (!circleName) {
@@ -741,8 +796,8 @@ export default function AdminExamsPage() {
     }))
 
     const [studentsResponse, examsResponse] = await Promise.all([
-      fetch(`/api/students?circle=${encodeURIComponent(selectedCircle)}`, { cache: "no-store" }),
-      fetch(`/api/exams?circle=${encodeURIComponent(selectedCircle)}`, { cache: "no-store" }),
+      fetch(`/api/students?circle=${encodeURIComponent(examDialogCircle)}`, { cache: "no-store" }),
+      fetch(`/api/exams?circle=${encodeURIComponent(examDialogCircle)}`, { cache: "no-store" }),
     ])
 
     const studentsData = await studentsResponse.json()
@@ -763,11 +818,10 @@ export default function AdminExamsPage() {
       },
     ] as const))
 
-    setStudents(loadedStudents)
-    setExams((examsData.exams || []) as ExamRow[])
+    setExamDialogStudents(loadedStudents)
+    setExamDialogExams((examsData.exams || []) as ExamRow[])
     setTableMissing(Boolean(examsData.tableMissing))
-    setStudentPlanProgressMap(Object.fromEntries(planEntries))
-    await loadCircleSchedules(selectedCircle)
+    setExamDialogPlanProgressMap(Object.fromEntries(planEntries))
   }
 
   const handleSaveExam = async () => {
@@ -1066,8 +1120,8 @@ export default function AdminExamsPage() {
           ) : null}
 
           <Dialog open={isExamDialogOpen} onOpenChange={setIsExamDialogOpen}>
-            <DialogContent className="top-3 max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-24px)] max-w-5xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:max-h-[90vh] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
-              <div className="flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[28px] bg-white sm:max-h-[90vh]">
+            <DialogContent className="top-3 w-[calc(100vw-24px)] max-w-3xl translate-y-0 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-white p-0 shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:top-[50%] sm:w-full sm:translate-y-[-50%]" showCloseButton={false}>
+              <div className="flex flex-col overflow-hidden rounded-[28px] bg-white">
                 <DialogHeader className="border-b border-[#e5edf6] px-4 py-4 sm:px-6 sm:py-5">
                   <DialogTitle className="flex items-center justify-start gap-2 text-left text-2xl font-black text-[#1a2332]">
                     <ClipboardCheck className="h-5 w-5 text-[#3453a7]" />
@@ -1076,15 +1130,15 @@ export default function AdminExamsPage() {
                   <DialogDescription className="sr-only">نافذة اختيار الحلقة والطالب ثم تسجيل نتيجة الاختبار.</DialogDescription>
                 </DialogHeader>
 
-                <div className="overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
-                  <div className="space-y-6">
+                <div className="px-4 py-5 sm:px-6 sm:py-6">
+                  <div className="space-y-5">
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2 text-right">
                         <Label className="text-sm font-black text-[#334155]">الحلقة</Label>
                         <Select
-                          value={selectedCircle}
+                          value={examDialogCircle}
                           onValueChange={(value) => {
-                            setSelectedCircle(value)
+                            setExamDialogCircle(value)
                             setForm((current) => ({ ...current, studentId: "", selectedJuz: "", alertsCount: "0", mistakesCount: "0" }))
                           }}
                           dir="rtl"
@@ -1103,17 +1157,17 @@ export default function AdminExamsPage() {
                       <div className="space-y-2 text-right">
                         <Label className="text-sm font-black text-[#334155]">الطالب</Label>
                         <Select
-                          key={selectedCircle || "no-circle"}
+                          key={examDialogCircle || "no-circle"}
                           value={form.studentId || undefined}
                           onValueChange={(value) => setForm((current) => ({ ...current, studentId: value, selectedJuz: "", alertsCount: "0", mistakesCount: "0" }))}
                           dir="rtl"
-                          disabled={!selectedCircle || isCircleDataLoading || filteredStudents.length === 0}
+                          disabled={!examDialogCircle || isExamDialogLoading || examDialogFilteredStudents.length === 0}
                         >
                           <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white disabled:cursor-not-allowed disabled:opacity-60">
-                            <SelectValue placeholder={selectedCircle ? (isCircleDataLoading ? "جاري تحميل الطلاب" : filteredStudents.length > 0 ? "اختر الطالب" : "لا يوجد طلاب") : "اختر الحلقة أولاً"} />
+                            <SelectValue placeholder={examDialogCircle ? (isExamDialogLoading ? "جاري تحميل الطلاب" : examDialogFilteredStudents.length > 0 ? "اختر الطالب" : "لا يوجد طلاب") : "اختر الحلقة أولاً"} />
                           </SelectTrigger>
                           <SelectContent dir="rtl">
-                            {filteredStudents.map((student) => (
+                            {examDialogFilteredStudents.map((student) => (
                               <SelectItem key={`exam-dialog-student-${student.id}`} value={student.id}>{student.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -1121,120 +1175,71 @@ export default function AdminExamsPage() {
                       </div>
                     </div>
 
-                    <Card className="rounded-[30px] border-[#dbe5f1] bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
-                      <CardHeader className="text-right">
-                        <CardTitle className="flex items-center justify-start gap-2 text-2xl font-black text-[#1a2332]">
-                          <ClipboardCheck className="h-6 w-6 text-[#3453a7]" />
-                          اختبار الطالب
-                        </CardTitle>
-                        {selectedStudent ? (
-                          <CardDescription className="text-right text-sm font-bold text-[#64748b]">
-                            الطالب المحدد حالياً: {selectedStudent.name}
-                          </CardDescription>
-                        ) : null}
-                      </CardHeader>
-
-                      <CardContent>
-                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(180px,1fr)_minmax(150px,0.75fr)_minmax(150px,0.75fr)_auto] lg:items-end">
-                          <div className="min-w-0 space-y-2 text-right">
-                            <Label className="text-sm font-black text-[#334155]">{portionUnitLabel} المراد اختباره</Label>
-                            <Select key={form.studentId || "no-student"} value={form.selectedJuz || undefined} onValueChange={(value) => setForm((current) => ({ ...current, selectedJuz: value }))} dir="rtl" disabled={!selectedStudent}>
-                              <SelectTrigger className="h-11 rounded-2xl border-[#d7e3f2] bg-white">
-                                <SelectValue placeholder={selectedStudent ? `اختر ${portionUnitLabel}` : "اختر الطالب أولاً"} />
-                              </SelectTrigger>
-                              <SelectContent dir="rtl">
-                                {availablePortions.map((portion) => (
-                                  <SelectItem key={`${portion.portionType}-${portion.portionNumber}`} value={String(portion.portionNumber)}>{portion.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {selectedStudent && eligiblePortionNumbers.length > 0 && availableJuzs.length === 0 ? (
-                              <div className="text-xs font-bold text-[#20335f]">كل محفوظه تم اختباره فيه.</div>
-                            ) : null}
-                          </div>
-
-                          <div className="min-w-0 space-y-2 text-right">
-                            <Label className="text-sm font-black text-[#334155]">اسم المختبر</Label>
-                            <Input value={form.testedByName} onChange={(event) => setForm((current) => ({ ...current, testedByName: event.target.value }))} placeholder="اكتب اسم المختبر" className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                          </div>
-
-                          <div className="min-w-0 space-y-2 text-right">
-                            <Label className="text-sm font-black text-[#334155]">عدد التنبيهات</Label>
-                            <Input type="number" min="0" value={form.alertsCount} onChange={(event) => setForm((current) => ({ ...current, alertsCount: event.target.value }))} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                          </div>
-                          <div className="min-w-0 space-y-2 text-right">
-                            <Label className="text-sm font-black text-[#334155]">عدد الأخطاء</Label>
-                            <Input type="number" min="0" value={form.mistakesCount} onChange={(event) => setForm((current) => ({ ...current, mistakesCount: event.target.value }))} className="h-11 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
-                          </div>
-
-                          <div className="flex justify-end lg:pb-0.5">
-                            <Button onClick={handleSaveExam} disabled={isSaving || tableMissing || !form.selectedJuz} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7] lg:w-auto">
-                              {isSaving ? "جاري الحفظ..." : "حفظ الاختبار"}
-                            </Button>
+                    <div className="rounded-[30px] border border-[#dbe5f1] bg-[#fcfdff] p-5 shadow-[0_16px_45px_rgba(15,23,42,0.06)] sm:p-6">
+                      <div className="mb-5 flex flex-col gap-2 text-right sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="text-2xl font-black text-[#1a2332]">اختبار الطالب</div>
+                          <div className="text-sm font-bold text-[#64748b]">
+                            {selectedStudent ? `الطالب المحدد حالياً: ${selectedStudent.name}` : "اختر الحلقة والطالب ثم سجّل نتيجة الاختبار."}
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                        <div className="rounded-2xl bg-[#eef4ff] px-4 py-2 text-sm font-black text-[#3453a7]">
+                          النتيجة المتوقعة: {scorePreview.finalScore} / {settingsPreview.maxScore}
+                        </div>
+                      </div>
 
-                    {selectedStudent ? (
-                      <Card className="rounded-[30px] border-[#dde6f0] bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
-                        <CardHeader className="text-right">
-                          <CardTitle className="flex items-center justify-start gap-2 text-2xl font-black text-[#1a2332]">
-                            <ClipboardCheck className="h-5 w-5 text-[#3453a7]" />
-                            سجل الاختبارات
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="overflow-x-auto rounded-[24px] border border-[#ebeff5]">
-                            <Table className="min-w-[760px]">
-                              <TableHeader>
-                                <TableRow className="bg-[#f8fafc] hover:bg-[#f8fafc]">
-                                  <TableHead className="text-right font-black text-[#475569]">الطالب</TableHead>
-                                  <TableHead className="text-right font-black text-[#475569]">النطاق</TableHead>
-                                  <TableHead className="text-right font-black text-[#475569]">التاريخ</TableHead>
-                                  <TableHead className="text-right font-black text-[#475569]">تنبيهات</TableHead>
-                                  <TableHead className="text-right font-black text-[#475569]">الأخطاء</TableHead>
-                                  <TableHead className="text-right font-black text-[#475569]">النتيجة</TableHead>
-                                  <TableHead className="text-right font-black text-[#475569]">الحالة</TableHead>
-                                  <TableHead className="text-right font-black text-[#475569]">المختبِر</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {studentExams.length > 0 ? studentExams.map((exam) => {
-                                  const student = normalizeStudentRelation(exam.students)
-                                  return (
-                                    <TableRow key={exam.id}>
-                                      <TableCell className="text-right font-bold text-[#1f2937]">{student?.name || "طالب"}</TableCell>
-                                      <TableCell className="text-right text-sm font-bold text-[#1f2937]">{getExamPortionDisplay(exam)}</TableCell>
-                                      <TableCell className="text-right text-sm font-semibold text-[#475569]">{exam.exam_date}</TableCell>
-                                      <TableCell className="text-right text-sm font-bold text-[#475569]">{exam.alerts_count}</TableCell>
-                                      <TableCell className="text-right text-sm font-bold text-[#475569]">{exam.mistakes_count}</TableCell>
-                                      <TableCell className="text-right text-sm font-black text-[#1f2937]">{exam.final_score}</TableCell>
-                                      <TableCell className="text-right">
-                                        <Badge className={`${getStatusTone(exam.passed)} border-0 px-3 py-1 text-xs font-black`}>
-                                          {exam.passed ? "مجتاز" : "غير مجتاز"}
-                                        </Badge>
-                                      </TableCell>
-                                      <TableCell className="text-right text-sm font-semibold text-[#475569]">{exam.tested_by_name || "-"}</TableCell>
-                                    </TableRow>
-                                  )
-                                }) : (
-                                  <TableRow>
-                                    <TableCell colSpan={8} className="py-10 text-center text-sm font-bold text-[#7b8794]">لا توجد اختبارات مسجلة لهذا الطالب بعد.</TableCell>
-                                  </TableRow>
-                                )}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ) : null}
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2 text-right">
+                          <Label className="text-sm font-black text-[#334155]">اسم المختبر</Label>
+                          <Input value={form.testedByName} onChange={(event) => setForm((current) => ({ ...current, testedByName: event.target.value }))} placeholder="اكتب اسم المختبر" className="h-12 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
+                        </div>
+
+                        <div className="space-y-2 text-right">
+                          <Label className="text-sm font-black text-[#334155]">{portionUnitLabel} المراد اختباره</Label>
+                          <Select key={form.studentId || "no-student"} value={form.selectedJuz || undefined} onValueChange={(value) => setForm((current) => ({ ...current, selectedJuz: value }))} dir="rtl" disabled={!selectedStudent || isExamDialogLoading}>
+                            <SelectTrigger className="h-12 rounded-2xl border-[#d7e3f2] bg-white">
+                              <SelectValue placeholder={selectedStudent ? `اختر ${portionUnitLabel}` : "اختر الطالب أولاً"} />
+                            </SelectTrigger>
+                            <SelectContent dir="rtl">
+                              {availablePortions.map((portion) => (
+                                <SelectItem key={`${portion.portionType}-${portion.portionNumber}`} value={String(portion.portionNumber)}>{portion.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2 text-right">
+                          <Label className="text-sm font-black text-[#334155]">عدد الأخطاء</Label>
+                          <Input type="number" min="0" value={form.mistakesCount} onChange={(event) => setForm((current) => ({ ...current, mistakesCount: event.target.value }))} className="h-12 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
+                        </div>
+
+                        <div className="space-y-2 text-right">
+                          <Label className="text-sm font-black text-[#334155]">عدد التنبيهات</Label>
+                          <Input type="number" min="0" value={form.alertsCount} onChange={(event) => setForm((current) => ({ ...current, alertsCount: event.target.value }))} className="h-12 rounded-2xl border-[#d7e3f2] bg-white text-base font-bold" />
+                        </div>
+                      </div>
+
+                      {selectedStudent && eligiblePortionNumbers.length > 0 && availableJuzs.length === 0 ? (
+                        <div className="mt-4 rounded-2xl bg-[#f8fbff] px-4 py-3 text-right text-sm font-bold text-[#20335f]">
+                          كل المحفوظ المتاح لهذا الطالب تم اختباره فيه بالفعل.
+                        </div>
+                      ) : null}
+
+                      {!selectedStudent && !isExamDialogLoading ? (
+                        <div className="mt-4 rounded-2xl border border-dashed border-[#d7e3f2] px-4 py-4 text-right text-sm font-bold text-[#64748b]">
+                          اختر الحلقة والطالب أولاً ليظهر {portionUnitLabel} المتاح للاختبار.
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex flex-col-reverse justify-end gap-3 border-t border-[#e5edf6] px-4 py-4 sm:flex-row sm:px-6">
                   <Button type="button" variant="outline" onClick={() => setIsExamDialogOpen(false)} className="h-11 w-full rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#1a2332] hover:bg-[#f8fbff] sm:w-auto">
                     إغلاق
+                  </Button>
+                  <Button type="button" onClick={handleSaveExam} disabled={isSaving || isExamDialogLoading || tableMissing || !form.selectedJuz} className="h-11 w-full rounded-2xl bg-[#3453a7] px-6 text-sm font-black text-white hover:bg-[#274187] disabled:bg-[#3453a7] sm:w-auto">
+                    {isSaving ? "جاري الحفظ..." : "حفظ الاختبار"}
                   </Button>
                 </div>
               </div>
