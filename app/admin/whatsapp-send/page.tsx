@@ -13,7 +13,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useWhatsAppStatus } from "@/hooks/use-whatsapp-status"
-import { MessageCircle, Send, Users, CheckCircle2, XCircle, Phone, CircleAlert, ImagePlus, X } from "lucide-react"
+import { MessageCircle, Send, Users, CheckCircle2, XCircle, Phone, CircleAlert, X } from "lucide-react"
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { SiteLoader } from "@/components/ui/site-loader"
 import { formatGuardianPhoneForDisplay } from "@/lib/phone-number"
@@ -542,15 +542,14 @@ export default function WhatsAppSendPage() {
                           <Label htmlFor="whatsapp-image" className="text-sm font-semibold text-[#1a2332]">إرفاق صورة</Label>
                         </div>
                         {imagePayload ? (
-                          <Button
+                          <button
                             type="button"
-                            variant="outline"
                             onClick={clearImageSelection}
-                            className="text-sm h-9 rounded-lg border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            aria-label="إزالة الصورة"
+                            className="text-red-600 transition-colors hover:text-red-700"
                           >
-                            <X className="me-1.5 h-4 w-4" />
-                            إزالة الصورة
-                          </Button>
+                            <X className="h-5 w-5" />
+                          </button>
                         ) : null}
                       </div>
 
@@ -584,14 +583,6 @@ export default function WhatsAppSendPage() {
                             alt="معاينة الصورة"
                             className="h-56 w-full object-cover"
                           />
-                          <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                            <div>
-                              <p className="font-semibold text-[#1a2332]">{imagePayload.fileName}</p>
-                            </div>
-                            <div className="rounded-full bg-[#3453a7]/10 p-2 text-[#3453a7]">
-                              <ImagePlus className="h-4 w-4" />
-                            </div>
-                          </div>
                         </div>
                       ) : null}
                     </div>
