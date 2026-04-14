@@ -48,6 +48,8 @@ import {
   BookOpen,
 } from "lucide-react"
 
+const ALL_HALAQAH_VALUE = "all"
+
 /* -------------------------------------------------------------------------- */
 /*                                   TYPES                                    */
 /* -------------------------------------------------------------------------- */
@@ -77,6 +79,44 @@ interface Quiz {
   correctAnswer: number
 }
 
+function dedupeLevels(levels: Level[]) {
+  const levelMap = new Map<number, Level>()
+
+  for (const level of levels) {
+    if (!levelMap.has(level.level_number)) {
+      levelMap.set(level.level_number, level)
+    }
+  }
+
+  return Array.from(levelMap.values()).sort((left, right) => left.level_number - right.level_number)
+}
+
+function dedupeContents(items: LevelContent[]) {
+  const contentMap = new Map<string, LevelContent>()
+
+  for (const item of items) {
+    const key = [item.content_title, item.content_description || "", item.content_url, item.content_type].join("::")
+    if (!contentMap.has(key)) {
+      contentMap.set(key, item)
+    }
+  }
+
+  return Array.from(contentMap.values())
+}
+
+function dedupeQuizzes(items: Quiz[]) {
+  const quizMap = new Map<string, Quiz>()
+
+  for (const item of items) {
+    const key = [item.question, JSON.stringify(item.options), item.correctAnswer].join("::")
+    if (!quizMap.has(key)) {
+      quizMap.set(key, item)
+    }
+  }
+
+  return Array.from(quizMap.values())
+}
+
 /* -------------------------------------------------------------------------- */
 
 function getSupabase() {
@@ -90,10 +130,8 @@ export default function AdminPathwaysPage() {
   const { isLoading: authLoading, isVerified: authVerified } = useAdminAuth("إدارة المسار");
   const { isReady: isWhatsAppReady, isLoading: isWhatsAppStatusLoading } = useWhatsAppStatus()
 
-    // نافذة تعديل النقاط
-    const [showPointsModal, setShowPointsModal] = useState(false);
+    // قيمة النقاط داخل نافذة تعديل المستوى
     const [pointsEditValue, setPointsEditValue] = useState<number>(0);
-    const [pointsEditLevel, setPointsEditLevel] = useState<Level | null>(null);
   const router = useRouter()
 
   const [levels, setLevels] = useState<Level[]>([])
@@ -116,6 +154,7 @@ export default function AdminPathwaysPage() {
     setNotification(msg)
     setTimeout(() => setNotification(""), 3000)
   }
+  const isAllHalaqahSelected = selectedHalaqah === ALL_HALAQAH_VALUE
 
   /* ------------------------------ Content Form ----------------------------- */
   const [contentTitle, setContentTitle] = useState("")
@@ -192,11 +231,16 @@ export default function AdminPathwaysPage() {
   async function loadLevels(halaqah = selectedHalaqah) {
     if (!halaqah) return [] as Level[]
     const supabase = getSupabase()
-    const { data, error } = await supabase
-      .from("pathway_levels").select("*").eq("halaqah", halaqah).order("level_number")
+    let query = supabase.from("pathway_levels").select("*").order("level_number")
+
+    if (halaqah !== ALL_HALAQAH_VALUE) {
+      query = query.eq("halaqah", halaqah)
+    }
+
+    const { data, error } = await query
 
     if (!error && data) {
-      const nextLevels = data as Level[]
+      const nextLevels = halaqah === ALL_HALAQAH_VALUE ? dedupeLevels(data as Level[]) : (data as Level[])
       setLevels(nextLevels)
       return nextLevels
     }
@@ -219,20 +263,31 @@ export default function AdminPathwaysPage() {
   }
 
   async function loadContents() {
-    const res = await fetch(`/api/pathway-contents?level_id=${selectedLevel}&halaqah=${encodeURIComponent(selectedHalaqah)}`)
+    const params = new URLSearchParams({ level_id: String(selectedLevel) })
+    if (!isAllHalaqahSelected) {
+      params.set("halaqah", selectedHalaqah)
+    }
+
+    const res = await fetch(`/api/pathway-contents?${params.toString()}`)
     const json = await res.json()
-    setContents((p) => ({ ...p, [selectedLevel]: json.contents || [] }))
+    const nextContents = Array.isArray(json.contents) ? json.contents : []
+    setContents((p) => ({ ...p, [selectedLevel]: isAllHalaqahSelected ? dedupeContents(nextContents) : nextContents }))
   }
 
   async function loadLevelResults() {
     if (!selectedLevel || !selectedHalaqah) return;
     setIsLoadingResults(true);
     const supabase = getSupabase()
-    const { data, error } = await supabase
+    let query = supabase
       .from("pathway_level_completions")
       .select("id, student_id, points, level_number, students!inner(name, halaqah)")
       .eq("level_number", selectedLevel)
-      .eq("students.halaqah", selectedHalaqah);
+
+    if (!isAllHalaqahSelected) {
+      query = query.eq("students.halaqah", selectedHalaqah)
+    }
+
+    const { data, error } = await query;
     
     if (!error && data) {
       setLevelResults(data.map((r: any) => ({
@@ -249,19 +304,26 @@ export default function AdminPathwaysPage() {
 
   async function loadQuizzes() {
     const supabase = getSupabase()
-    const { data } = await supabase
-      .from("pathway_level_questions").select("*").eq("level_number", selectedLevel).eq("halaqah", selectedHalaqah)
-      .order("id")
+    let query = supabase
+      .from("pathway_level_questions").select("*").eq("level_number", selectedLevel)
+
+    if (!isAllHalaqahSelected) {
+      query = query.eq("halaqah", selectedHalaqah)
+    }
+
+    const { data } = await query.order("id")
 
     if (data) {
+      const nextQuizzes = data.map((q) => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correct_answer,
+      }))
+
       setQuizzes((p) => ({
         ...p,
-        [selectedLevel]: data.map((q) => ({
-          id: q.id,
-          question: q.question,
-          options: q.options,
-          correctAnswer: q.correct_answer,
-        })),
+        [selectedLevel]: isAllHalaqahSelected ? dedupeQuizzes(nextQuizzes) : nextQuizzes,
       }))
     }
   }
@@ -328,6 +390,11 @@ export default function AdminPathwaysPage() {
   }
 
   async function handleDeleteContent(id: string) {
+    if (isAllHalaqahSelected) {
+      showNotification("اختر حلقة محددة إذا أردت حذف المحتوى")
+      return
+    }
+
     await fetch(`/api/pathway-contents?id=${id}`, { method: "DELETE" })
     loadContents()
   }
@@ -336,11 +403,16 @@ export default function AdminPathwaysPage() {
     if (!quizQuestion || quizOptions.some((o) => !o)) return
 
     const supabase = getSupabase()
-    const { error } = await supabase.from("pathway_level_questions").insert({
-      level_number: selectedLevel, halaqah: selectedHalaqah, question: quizQuestion,
-      options: quizOptions,
-      correct_answer: correctAnswer,
-    })
+    const targetHalaqat = isAllHalaqahSelected ? circles.map((circle) => circle.name) : [selectedHalaqah]
+    const { error } = await supabase.from("pathway_level_questions").insert(
+      targetHalaqat.map((halaqah) => ({
+        level_number: selectedLevel,
+        halaqah,
+        question: quizQuestion,
+        options: quizOptions,
+        correct_answer: correctAnswer,
+      })),
+    )
 
     if (error) {
       showNotification("حدث خطأ أثناء إضافة السؤال")
@@ -356,12 +428,22 @@ export default function AdminPathwaysPage() {
   }
 
   async function handleDeleteQuiz(id: number) {
+    if (isAllHalaqahSelected) {
+      showNotification("اختر حلقة محددة إذا أردت حذف السؤال")
+      return
+    }
+
     const supabase = getSupabase()
     await supabase.from("pathway_level_questions").delete().eq("id", id)
     loadQuizzes()
   }
 
   async function handleAddLevel() {
+    if (isAllHalaqahSelected) {
+      showNotification("اختر حلقة محددة لإضافة مستوى جديد")
+      return
+    }
+
     const response = await fetch("/api/pathway-levels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -400,27 +482,33 @@ export default function AdminPathwaysPage() {
     }
 
     try {
-      const response = await fetch("/api/pathway-level-notifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          halaqah: selectedHalaqah,
-          level_number: selectedLevel,
-        }),
-      })
-      const data = await response.json().catch(() => null)
+      const targetHalaqat = isAllHalaqahSelected ? circles.map((circle) => circle.name) : [selectedHalaqah]
+      let sentCount = 0
 
-      if (!response.ok) {
-        const errorMessage = String(data?.error || "")
-        if (response.status === 400 && errorMessage.includes("لن يتم إرسال التنبيه")) {
-          showNotification(prefixMessage)
-          return
+      for (const halaqah of targetHalaqat) {
+        const response = await fetch("/api/pathway-level-notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            halaqah,
+            level_number: selectedLevel,
+          }),
+        })
+        const data = await response.json().catch(() => null)
+
+        if (!response.ok) {
+          const errorMessage = String(data?.error || "")
+          if (response.status === 400 && errorMessage.includes("لن يتم إرسال التنبيه")) {
+            continue
+          }
+
+          throw new Error(errorMessage || "تعذر إرسال تنبيه المسار")
         }
 
-        throw new Error(errorMessage || "تعذر إرسال تنبيه المسار")
+        sentCount += Number(data?.sent || 0)
       }
 
-      showNotification(data?.sent > 0 ? `${prefixMessage} وتم إشعار الطلاب تلقائيًا` : prefixMessage)
+      showNotification(sentCount > 0 ? `${prefixMessage} وتم إشعار الطلاب تلقائيًا` : prefixMessage)
     } catch (error) {
       showNotification(error instanceof Error ? `${prefixMessage}، لكن ${error.message}` : prefixMessage)
     }
@@ -455,23 +543,38 @@ export default function AdminPathwaysPage() {
   }
 
   async function handleDeleteLevel() {
+    if (isAllHalaqahSelected) {
+      showNotification("اختر حلقة محددة لحذف مستوى")
+      return;
+    }
+
     if (levels.length === 0) {
       showNotification('لا يوجد مستويات للحذف');
       return;
     }
     // احصل على رقم آخر مستوى
     const maxLevel = Math.max(...levels.map(l => l.level_number));
-    // حذف بدون تأكيد
-    const supabase = getSupabase()
-    const { error } = await supabase.from('pathway_levels').delete().eq('level_number', maxLevel).eq("halaqah", selectedHalaqah);
-    if (!error) {
+    try {
+      const response = await fetch("/api/pathway-levels", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ halaqah: selectedHalaqah, levelNumber: maxLevel }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "تعذر حذف المستوى");
+      }
+
       showNotification('تم حذف آخر مستوى بنجاح');
-      // جلب المستويات من القاعدة مباشرة بعد الحذف
+      const supabase = getSupabase()
       const { data: newLevels, error: fetchError } = await supabase
         .from('pathway_levels')
         .select('*')
         .eq('halaqah', selectedHalaqah)
         .order('level_number');
+
       if (!fetchError && newLevels) {
         setLevels(newLevels);
         if (newLevels.length > 0) {
@@ -483,13 +586,18 @@ export default function AdminPathwaysPage() {
       } else {
         showNotification('تم الحذف لكن لم يتم تحديث القائمة!');
       }
-    } else {
-      showNotification('حدث خطأ أثناء حذف المستوى: ' + error.message);
+    } catch (error) {
+      showNotification('حدث خطأ أثناء حذف المستوى: ' + (error instanceof Error ? error.message : 'خطأ غير معروف'));
     }
   }
 
   async function handleToggleLockLevel() {
     if (!level) return;
+    if (isAllHalaqahSelected) {
+      showNotification("اختر حلقة محددة لتعديل حالة المستوى")
+      return;
+    }
+
     const supabase = getSupabase()
     const { error } = await supabase.from('pathway_levels').update({ is_locked: !level.is_locked }).eq('level_number', selectedLevel).eq("halaqah", selectedHalaqah);
     if (!error) {
@@ -540,6 +648,7 @@ export default function AdminPathwaysPage() {
                     <SelectValue placeholder="اختر الحلقة" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value={ALL_HALAQAH_VALUE}>جميع الحلقات</SelectItem>
                     {circles.map(c => (
                       <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                     ))}
@@ -596,7 +705,7 @@ export default function AdminPathwaysPage() {
                   {level?.is_locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                 </button>
                 <button
-                  onClick={() => { setEditTitle(level?.title || ""); setEditDescription(level?.description || ""); setShowEditModal(true) }}
+                  onClick={() => { setEditTitle(level?.title || ""); setEditDescription(level?.description || ""); setPointsEditValue(level?.points || 0); setShowEditModal(true) }}
                   title="تعديل المستوى"
                   className="w-8 h-8 rounded-lg border border-[#3453a7]/50 text-[#4f73d1] hover:bg-[#3453a7]/10 flex items-center justify-center transition-colors"
                 >
@@ -609,8 +718,6 @@ export default function AdminPathwaysPage() {
                 <button
                   key={l.id}
                   onClick={() => setSelectedLevel(l.level_number)}
-                  onDoubleClick={() => { setPointsEditLevel(l); setPointsEditValue(l.points); setShowPointsModal(true) }}
-                  title="انقر مرتين لتعديل النقاط"
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-medium transition-colors ${
                     l.level_number === selectedLevel
                       ? "border-[#3453a7] bg-white text-[#4f73d1] font-bold"
@@ -645,6 +752,10 @@ export default function AdminPathwaysPage() {
             </div>
 
             <div className="px-6 py-4 space-y-3">
+              {isAllHalaqahSelected && (
+                <p className="text-sm text-[#4f73d1]">سيتم تطبيق المحتوى والأسئلة الجديدة على جميع الحلقات، بينما الحذف وتعديل بنية المستويات يتطلبان اختيار حلقة محددة.</p>
+              )}
+
               {showContentForm && (
                 <div className="space-y-3 p-4 bg-[#fafaf9] rounded-xl border border-[#3453a7]/20 mb-4">
                   <Input placeholder="عنوان المحتوى" value={contentTitle} onChange={(e) => setContentTitle(e.target.value)} />
@@ -803,35 +914,19 @@ export default function AdminPathwaysPage() {
             <h2 className="text-xl font-bold text-[#1a2332]">تعديل المستوى</h2>
             <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="اسم المستوى" />
             <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="وصف المستوى" />
+            <Input type="number" min={0} value={pointsEditValue} onChange={(e) => setPointsEditValue(Number(e.target.value))} placeholder="نقاط المستوى" />
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowEditModal(false)} className="px-4 py-2 rounded-lg border border-neutral-200 text-neutral-500 text-sm hover:bg-neutral-50 transition-colors">إلغاء</button>
               <button onClick={async () => {
                 if (level) {
-                  const supabase = getSupabase()
-                  await supabase.from("pathway_levels").update({ title: editTitle, description: editDescription }).eq("id", level.id)
-                  setShowEditModal(false)
-                  loadLevels()
-                }
-              }} className="px-4 py-2 rounded-lg border border-[#3453a7]/50 bg-white hover:bg-[#f8fafc] text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors">حفظ</button>
-            </div>
-          </div>
-        </div>
-      )}
+                  if (isAllHalaqahSelected) {
+                    showNotification("اختر حلقة محددة لتعديل المستوى")
+                    return
+                  }
 
-      {/* Points Edit Modal */}
-      {showPointsModal && pointsEditLevel && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30" dir="rtl">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-[#3453a7]/40 shadow-xl space-y-4">
-            <h2 className="text-xl font-bold text-[#1a2332]">تعديل نقاط المستوى</h2>
-            <p className="text-sm font-semibold text-[#4f73d1]">{pointsEditLevel.title}</p>
-            <Input type="number" min={0} value={pointsEditValue} onChange={(e) => setPointsEditValue(Number(e.target.value))} />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowPointsModal(false)} className="px-4 py-2 rounded-lg border border-neutral-200 text-neutral-500 text-sm hover:bg-neutral-50 transition-colors">إلغاء</button>
-              <button onClick={async () => {
-                if (pointsEditLevel) {
                   const supabase = getSupabase()
-                  await supabase.from("pathway_levels").update({ points: pointsEditValue }).eq("id", pointsEditLevel.id)
-                  setShowPointsModal(false)
+                  await supabase.from("pathway_levels").update({ title: editTitle, description: editDescription, points: pointsEditValue }).eq("id", level.id)
+                  setShowEditModal(false)
                   loadLevels()
                 }
               }} className="px-4 py-2 rounded-lg border border-[#3453a7]/50 bg-white hover:bg-[#f8fafc] text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors">حفظ</button>

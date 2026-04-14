@@ -29,15 +29,25 @@ export async function POST(request: Request) {
     if (!level_id || !content_title || !content_type) {
       return NextResponse.json({ error: "جميع الحقول مطلوبة" }, { status: 400 });
     }
+    let targetHalaqat = [halaqah]
+
+    if (halaqah === "all") {
+      const { data: circles, error: circlesError } = await supabase.from("circles").select("name").order("name")
+      if (circlesError) throw circlesError
+      targetHalaqat = (circles || []).map((circle) => circle.name).filter(Boolean)
+    }
+
+    if (targetHalaqat.length === 0) {
+      return NextResponse.json({ error: "لا توجد حلقات متاحة لإضافة المحتوى" }, { status: 400 })
+    }
+
     const { data, error } = await supabase
       .from("pathway_contents")
-      .insert([
-        { level_id, content_title, content_description, content_url, content_type, halaqah }
-      ])
+      .insert(targetHalaqat.map((halaqahName) => ({ level_id, content_title, content_description, content_url, content_type, halaqah: halaqahName })))
       .select()
-      .single();
+    
     if (error) throw error;
-    return NextResponse.json({ content: data });
+    return NextResponse.json({ content: Array.isArray(data) ? data[0] : data });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || JSON.stringify(error) || "فشل في إضافة المحتوى" }, { status: 500 });
   }

@@ -17,6 +17,7 @@ import { MessageCircle, Send, Users, CheckCircle2, XCircle, Phone, CircleAlert, 
 import { useAdminAuth } from "@/hooks/use-admin-auth"
 import { SiteLoader } from "@/components/ui/site-loader"
 import { formatGuardianPhoneForDisplay } from "@/lib/phone-number"
+import { getOfflineErrorMessage } from "@/lib/network-error"
 
 interface Student {
   id: string
@@ -286,6 +287,15 @@ export default function WhatsAppSendPage() {
       return
     }
 
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      toast({
+        title: "لا يوجد اتصال بالإنترنت",
+        description: "تحقق من اتصالك بالإنترنت ثم أعد المحاولة.",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!isWhatsAppReady) {
       toast({
         title: "واتساب غير مربوط",
@@ -369,9 +379,10 @@ export default function WhatsAppSendPage() {
       }
     } catch (error) {
       setIsSending(false)
+      const offlineMessage = getOfflineErrorMessage(error)
       toast({
-        title: "فشل",
-        description: error instanceof Error ? error.message : "حدث خطأ أثناء تجهيز رسائل واتساب",
+        title: offlineMessage || "فشل",
+        description: offlineMessage || (error instanceof Error ? error.message : "حدث خطأ أثناء تجهيز رسائل واتساب"),
         variant: "destructive",
       })
     }

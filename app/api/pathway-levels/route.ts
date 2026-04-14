@@ -68,3 +68,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const auth = await requireRoles(request, ["admin", "supervisor"])
+    if ("response" in auth) {
+      return auth.response
+    }
+
+    const body = await request.json()
+    const halaqah = String(body?.halaqah || "").trim()
+    const levelNumber = Number(body?.levelNumber)
+
+    if (!halaqah || !Number.isInteger(levelNumber) || levelNumber <= 0) {
+      return NextResponse.json({ error: "بيانات حذف المستوى غير مكتملة" }, { status: 400 })
+    }
+
+    const supabase = createAdminClient()
+    const { error } = await supabase
+      .from("pathway_levels")
+      .delete()
+      .eq("halaqah", halaqah)
+      .eq("level_number", levelNumber)
+
+    if (error) {
+      throw error
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("[pathway-levels] DELETE:", error)
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 })
+  }
+}

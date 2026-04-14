@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { toast } from "@/hooks/use-toast"
 import { SiteLoader } from "@/components/ui/site-loader"
 import { Bell, Send, CheckSquare, Square, Users, GraduationCap, ShieldCheck, Search, Loader2 } from "lucide-react"
+import { getOfflineErrorMessage } from "@/lib/network-error"
 
 interface User {
   id: string
@@ -152,6 +153,15 @@ export default function AdminNotificationsClient() {
       return
     }
 
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      toast({
+        title: "لا يوجد اتصال بالإنترنت",
+        description: "تحقق من اتصالك بالإنترنت ثم أعد المحاولة.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setSending(true)
     try {
       const response = await fetch("/api/notifications", {
@@ -174,7 +184,12 @@ export default function AdminNotificationsClient() {
       
     } catch (e: any) {
       console.error(e)
-      toast({ title: e.message || "حدث خطأ أثناء الإرسال", variant: "destructive" })
+      const offlineMessage = getOfflineErrorMessage(e)
+      toast({
+        title: offlineMessage || e.message || "حدث خطأ أثناء الإرسال",
+        description: offlineMessage ? "تحقق من اتصالك بالإنترنت ثم أعد المحاولة." : undefined,
+        variant: "destructive",
+      })
     } finally {
       setSending(false)
     }

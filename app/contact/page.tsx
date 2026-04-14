@@ -7,6 +7,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import { useAlertDialog } from "@/hooks/use-confirm-dialog"
+import { getOfflineErrorMessage } from "@/lib/network-error"
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -30,6 +31,12 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      await showAlert("لا يوجد اتصال بالإنترنت", "خطأ")
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
@@ -51,7 +58,7 @@ export default function ContactPage() {
       }
     } catch (error) {
       console.error("[v0] Error submitting form:", error)
-      await showAlert("حدث خطأ أثناء إرسال الرسالة", "خطأ")
+      await showAlert(getOfflineErrorMessage(error) || "حدث خطأ أثناء إرسال الرسالة", "خطأ")
     } finally {
       setIsSubmitting(false)
     }
