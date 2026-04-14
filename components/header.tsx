@@ -1828,7 +1828,7 @@ export function Header() {
                     {
                       icon: ClipboardCheck,
 
-                      label: "إدارة الاختبارات",
+                      label: "الاختبارات",
 
                       permKey: "إدارة الاختبارات",
 
@@ -1838,7 +1838,7 @@ export function Header() {
                     {
                       icon: Map,
 
-                      label: "إدارة المسار",
+                      label: "المسار",
 
                       permKey: "إدارة المسار",
 
@@ -1848,11 +1848,21 @@ export function Header() {
                     {
                       icon: ShoppingBag,
 
-                      label: "إدارة المتجر",
+                      label: "المتجر",
 
                       permKey: "إدارة المتجر",
 
                       path: "/admin/store-management",
+                    },
+
+                    {
+                      icon: CalendarDays,
+
+                      label: "يوم السرد",
+
+                      permKey: "يوم السرد",
+
+                      path: "/admin/recitation-day",
                     },
 
                     {
@@ -1893,16 +1903,6 @@ export function Header() {
                       permKey: "الإرسال إلى أولياء الأمور",
 
                       path: "/admin/whatsapp-send",
-                    },
-
-                    {
-                      icon: CalendarDays,
-
-                      label: "يوم السرد",
-
-                      permKey: "يوم السرد",
-
-                      path: "/admin/recitation-day",
                     },
 
                     {
