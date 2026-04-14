@@ -209,6 +209,13 @@ export default function AdminPathwaysPage() {
     }
   }, [selectedLevel, selectedHalaqah])
 
+  useEffect(() => {
+    if (!levels.some((item) => item.level_number === selectedLevel)) {
+      setShowContentForm(false)
+      setShowQuizForm(false)
+    }
+  }, [levels, selectedLevel])
+
   /* -------------------------------------------------------------------------- */
   /*                                   LOADERS                                  */
   /* -------------------------------------------------------------------------- */
@@ -333,6 +340,11 @@ export default function AdminPathwaysPage() {
   /* -------------------------------------------------------------------------- */
 
   async function handleAddContent() {
+    if (!level) {
+      showNotification("اختر مستوى أولاً")
+      return
+    }
+
     if (!contentTitle) return
 
     let finalUrl = contentUrl
@@ -400,6 +412,11 @@ export default function AdminPathwaysPage() {
   }
 
   async function handleAddQuiz() {
+    if (!level) {
+      showNotification("اختر مستوى أولاً")
+      return
+    }
+
     if (!quizQuestion || quizOptions.some((o) => !o)) return
 
     const supabase = getSupabase()
@@ -567,25 +584,18 @@ export default function AdminPathwaysPage() {
         throw new Error(data?.error || "تعذر حذف المستوى");
       }
 
-      showNotification('تم حذف آخر مستوى بنجاح');
-      const supabase = getSupabase()
-      const { data: newLevels, error: fetchError } = await supabase
-        .from('pathway_levels')
-        .select('*')
-        .eq('halaqah', selectedHalaqah)
-        .order('level_number');
-
-      if (!fetchError && newLevels) {
-        setLevels(newLevels);
-        if (newLevels.length > 0) {
-          const prevMax = Math.max(...newLevels.map(l => l.level_number));
-          setSelectedLevel(prevMax);
-        } else {
-          setSelectedLevel(1);
-        }
+      const nextLevels = levels.filter((item) => item.level_number !== maxLevel)
+      setLevels(nextLevels)
+      if (nextLevels.length > 0) {
+        const nextSelectedLevel = nextLevels.some((item) => item.level_number === selectedLevel)
+          ? selectedLevel
+          : Math.max(...nextLevels.map((item) => item.level_number))
+        setSelectedLevel(nextSelectedLevel)
       } else {
-        showNotification('تم الحذف لكن لم يتم تحديث القائمة!');
+        setSelectedLevel(1)
       }
+
+      showNotification('تم حذف المستوى');
     } catch (error) {
       showNotification('حدث خطأ أثناء حذف المستوى: ' + (error instanceof Error ? error.message : 'خطأ غير معروف'));
     }
@@ -611,6 +621,7 @@ export default function AdminPathwaysPage() {
   /* -------------------------------------------------------------------------- */
 
   const level = levels.find((l) => l.level_number === selectedLevel)
+  const hasSelectedLevel = Boolean(level)
   const levelContents = contents[selectedLevel] || []
   const levelQuizzes = quizzes[selectedLevel] || []
 
@@ -744,14 +755,26 @@ export default function AdminPathwaysPage() {
                 </div>
               </div>
               <button
-                onClick={() => setShowContentForm(!showContentForm)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#3453a7]/50 bg-white hover:bg-[#f8fafc] text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors"
+                onClick={() => {
+                  if (!hasSelectedLevel) {
+                    showNotification("اختر مستوى أولاً")
+                    return
+                  }
+
+                  setShowContentForm(!showContentForm)
+                }}
+                disabled={!hasSelectedLevel}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#3453a7]/50 bg-white text-[#4f73d1] text-sm font-semibold transition-colors hover:bg-[#f8fafc] hover:text-[#3453a7] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-[#4f73d1]"
               >
                 <Plus className="w-3.5 h-3.5" /> إضافة محتوى
               </button>
             </div>
 
             <div className="px-6 py-4 space-y-3">
+              {!hasSelectedLevel && (
+                <p className="text-sm text-neutral-400 text-center py-2">اختر مستوى أولاً لتتمكن من إضافة المحتوى.</p>
+              )}
+
               {isAllHalaqahSelected && (
                 <p className="text-sm text-[#4f73d1]">سيتم تطبيق المحتوى والأسئلة الجديدة على جميع الحلقات، بينما الحذف وتعديل بنية المستويات يتطلبان اختيار حلقة محددة.</p>
               )}
@@ -831,14 +854,26 @@ export default function AdminPathwaysPage() {
                 <h2 className="text-base font-bold text-[#1a2332]">الاختبار</h2>
               </div>
               <button
-                onClick={() => setShowQuizForm(!showQuizForm)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#3453a7]/50 bg-white hover:bg-[#f8fafc] text-[#4f73d1] hover:text-[#3453a7] text-sm font-semibold transition-colors"
+                onClick={() => {
+                  if (!hasSelectedLevel) {
+                    showNotification("اختر مستوى أولاً")
+                    return
+                  }
+
+                  setShowQuizForm(!showQuizForm)
+                }}
+                disabled={!hasSelectedLevel}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#3453a7]/50 bg-white text-[#4f73d1] text-sm font-semibold transition-colors hover:bg-[#f8fafc] hover:text-[#3453a7] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-[#4f73d1]"
               >
                 <Plus className="w-3.5 h-3.5" /> إضافة سؤال
               </button>
             </div>
 
             <div className="px-6 py-4 space-y-3">
+              {!hasSelectedLevel && (
+                <p className="text-sm text-neutral-400 text-center py-2">اختر مستوى أولاً لتتمكن من إضافة الأسئلة.</p>
+              )}
+
               {showQuizForm && (
                 <div className="space-y-3 p-4 bg-[#fafaf9] rounded-xl border border-[#3453a7]/20 mb-4">
                   <Input placeholder="السؤال" value={quizQuestion} onChange={(e) => setQuizQuestion(e.target.value)} />
