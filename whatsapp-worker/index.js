@@ -664,6 +664,10 @@ function isClientUnpairedState(clientState) {
   return normalizedState === "UNPAIRED" || normalizedState === "UNPAIRED_IDLE"
 }
 
+function hasPendingQrSession() {
+  return Boolean(fs.existsSync(QR_IMAGE_PATH) && !workerState.authenticated)
+}
+
 async function verifyWhatsAppConnection() {
   if (isResettingSession || typeof whatsappClient.getState !== "function") {
     return
@@ -693,6 +697,17 @@ async function verifyWhatsAppConnection() {
     }
 
     isWhatsappReady = false
+
+    if (hasPendingQrSession() && (normalizedState === "UNKNOWN" || normalizedState === "DISCONNECTED")) {
+      persistWorkerState({
+        status: "waiting_for_qr",
+        qrAvailable: true,
+        ready: false,
+        authenticated: false,
+        lastError: null,
+      })
+      return
+    }
 
     if (isClientUnpairedState(normalizedState)) {
       persistWorkerState({
@@ -1225,6 +1240,18 @@ async function bootstrap() {
   whatsappClient.on("disconnected", (reason) => {
     isWhatsappReady = false
     log(`WhatsApp disconnected: ${reason}`)
+
+    if (hasPendingQrSession()) {
+      persistWorkerState({
+        status: "waiting_for_qr",
+        qrAvailable: true,
+        ready: false,
+        authenticated: false,
+        lastError: null,
+      })
+      return
+    }
+
     persistWorkerState({
       status: "disconnected",
       qrAvailable: fs.existsSync(QR_IMAGE_PATH),
