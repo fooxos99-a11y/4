@@ -12,16 +12,58 @@ const QRCode = require("qrcode")
 const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js")
 const { createClient } = require("@supabase/supabase-js")
 
+function sanitizeInstanceSlug(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+function getSupabaseProjectRef(url) {
+  try {
+    const hostname = new URL(String(url || "")).hostname
+    return hostname.split(".")[0] || null
+  } catch {
+    return null
+  }
+}
+
+function getDefaultInstanceSlug() {
+  const explicitSlug = sanitizeInstanceSlug(process.env.WHATSAPP_INSTANCE_SLUG)
+  if (explicitSlug) {
+    return explicitSlug
+  }
+
+  const configuredClientId = sanitizeInstanceSlug(process.env.WHATSAPP_CLIENT_ID)
+  if (configuredClientId) {
+    return configuredClientId
+  }
+
+  const projectRef = sanitizeInstanceSlug(process.env.SUPABASE_PROJECT_REF || getSupabaseProjectRef(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL))
+  if (projectRef) {
+    return projectRef
+  }
+
+  const portToken = sanitizeInstanceSlug(process.env.PORT)
+  if (portToken) {
+    return `port-${portToken}`
+  }
+
+  return "default"
+}
+
+const INSTANCE_SLUG = getDefaultInstanceSlug()
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const QUEUE_TABLE = process.env.WHATSAPP_QUEUE_TABLE || "whatsapp_queue"
 const HISTORY_TABLE = process.env.WHATSAPP_HISTORY_TABLE || "whatsapp_messages"
-const AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || path.join(__dirname, ".wwebjs_auth")
-const QR_IMAGE_PATH = process.env.WHATSAPP_QR_IMAGE_PATH || path.join(__dirname, "current-qr.png")
-const STATUS_FILE_PATH = process.env.WHATSAPP_STATUS_FILE_PATH || path.join(__dirname, "status.json")
-const COMMAND_FILE_PATH = process.env.WHATSAPP_COMMAND_FILE_PATH || path.join(__dirname, "command.json")
-const LOCK_FILE_PATH = process.env.WHATSAPP_LOCK_FILE_PATH || path.join(__dirname, "worker.lock")
-const CLIENT_ID = process.env.WHATSAPP_CLIENT_ID || "qabas-whatsapp-worker"
+const AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || path.join(__dirname, `.wwebjs_auth_${INSTANCE_SLUG}`)
+const QR_IMAGE_PATH = process.env.WHATSAPP_QR_IMAGE_PATH || path.join(__dirname, `current-qr-${INSTANCE_SLUG}.png`)
+const STATUS_FILE_PATH = process.env.WHATSAPP_STATUS_FILE_PATH || path.join(__dirname, `status-${INSTANCE_SLUG}.json`)
+const COMMAND_FILE_PATH = process.env.WHATSAPP_COMMAND_FILE_PATH || path.join(__dirname, `command-${INSTANCE_SLUG}.json`)
+const LOCK_FILE_PATH = process.env.WHATSAPP_LOCK_FILE_PATH || path.join(__dirname, `worker-${INSTANCE_SLUG}.lock`)
+const CLIENT_ID = process.env.WHATSAPP_CLIENT_ID || `qabas-whatsapp-worker-${INSTANCE_SLUG}`
 const WORKER_STATE_SETTING_ID = process.env.WHATSAPP_WORKER_STATE_SETTING_ID || "whatsapp_worker_state"
 const WORKER_COMMAND_SETTING_ID = process.env.WHATSAPP_WORKER_COMMAND_SETTING_ID || "whatsapp_worker_command"
 const MIN_DELAY_MS = Number(process.env.WHATSAPP_MIN_DELAY_MS || 5000)
