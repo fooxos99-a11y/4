@@ -1254,6 +1254,19 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
+  const startupErrorMessage = error instanceof Error ? error.message : String(error)
+  const missingBrowser = /Could not find Chrome|Could not find Chromium|Browser was not found/i.test(startupErrorMessage)
+
+  persistWorkerState({
+    status: missingBrowser ? "browser_missing" : "startup_failed",
+    ready: false,
+    authenticated: false,
+    qrAvailable: false,
+    qrValue: null,
+    authFailedAt: new Date().toISOString(),
+    lastError: startupErrorMessage,
+  })
+
   log("Worker crashed during startup.", error)
   releaseWorkerLock()
   process.exit(1)
