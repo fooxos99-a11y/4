@@ -143,6 +143,21 @@ function getStatusUi(status: WhatsAppStatusResponse) {
   }
 }
 
+function shouldShowWorkerNote(status: WhatsAppStatusResponse) {
+  if (!status.lastError) {
+    return false
+  }
+
+  const normalizedError = String(status.lastError).trim().toUpperCase()
+  const transientConnectionNote = normalizedError === "WHATSAPP STATE CHANGED TO UNKNOWN" || normalizedError === "WHATSAPP STATE CHANGED TO DISCONNECTED"
+
+  if (transientConnectionNote && status.qrAvailable && status.status === "waiting_for_qr") {
+    return false
+  }
+
+  return true
+}
+
 export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsAppQrDialogProps) {
   const confirmDialog = useConfirmDialog()
   const alertDialog = useAlertDialog()
@@ -157,6 +172,7 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
   const isConnected = status.workerOnline && status.ready && status.authenticated && status.status === "connected"
   const canDisconnect = isConnected && !isDisconnecting
   const autoRefreshIntervalMs = getAutoRefreshIntervalMs(status, imageFailed)
+  const showWorkerNote = shouldShowWorkerNote(status)
   const qrImageSrc = status.qrImageUrl
     ? `${status.qrImageUrl}${status.qrImageUrl.includes("?") ? "&" : "?"}v=${qrImageVersion}`
     : null
@@ -383,7 +399,7 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
               </div>
             )}
 
-            {status.lastError ? (
+            {showWorkerNote ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-right text-sm font-bold text-rose-700">
                 آخر ملاحظة من العامل: {status.lastError}
               </div>
