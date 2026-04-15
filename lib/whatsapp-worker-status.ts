@@ -45,12 +45,32 @@ function finalizeStatus(payload: WorkerStatusPayload, qrExists: boolean) {
   const fallback = getDefaultWhatsAppWorkerStatus()
   const heartbeatTime = payload.lastHeartbeatAt ? new Date(payload.lastHeartbeatAt).getTime() : 0
   const workerOnline = Boolean(heartbeatTime) && Date.now() - heartbeatTime <= ONLINE_THRESHOLD_MS
-  const hasQr = Boolean(payload.qrAvailable && (payload.qrValue || qrExists))
-  const isConnected = Boolean(workerOnline && payload.ready && payload.authenticated && payload.status === "connected")
+  const qrUpdatedAtTime = payload.qrUpdatedAt ? new Date(payload.qrUpdatedAt).getTime() : 0
+  const disconnectedAtTime = payload.disconnectedAt ? new Date(payload.disconnectedAt).getTime() : 0
+  const authFailedAtTime = payload.authFailedAt ? new Date(payload.authFailedAt).getTime() : 0
+  const connectedAtTime = payload.connectedAt ? new Date(payload.connectedAt).getTime() : 0
+  const normalizedStatus = String(payload.status || "not_started").trim().toLowerCase()
+  const hasQrValue = Boolean(payload.qrValue)
+  const hasQr = Boolean(
+    (payload.qrAvailable && (hasQrValue || qrExists)) ||
+    (hasQrValue && !payload.authenticated)
+  )
+  const shouldPreserveQrState = Boolean(
+    hasQr &&
+    !payload.authenticated &&
+    qrUpdatedAtTime &&
+    qrUpdatedAtTime >= Math.max(disconnectedAtTime, authFailedAtTime, connectedAtTime)
+  )
+  const isConnected = Boolean(workerOnline && payload.ready && payload.authenticated && normalizedStatus === "connected")
+
+  const resolvedStatus = shouldPreserveQrState && ["disconnected", "reconnecting", "unknown", "starting", "not_started"].includes(normalizedStatus)
+    ? "waiting_for_qr"
+    : normalizedStatus || "not_started"
 
   return {
     ...fallback,
     ...payload,
+    status: resolvedStatus,
     ready: isConnected,
     authenticated: isConnected,
     qrAvailable: hasQr,
