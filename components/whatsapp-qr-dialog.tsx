@@ -55,7 +55,7 @@ function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: b
   }
 
   if (status.qrAvailable && status.status === "waiting_for_qr") {
-    return 0
+    return 5000
   }
 
   switch (status.status) {
@@ -65,7 +65,7 @@ function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: b
     case "starting":
       return 1200
     case "waiting_for_qr":
-      return 0
+      return 5000
     default:
       return status.workerOnline ? 5000 : 0
   }
@@ -129,6 +129,14 @@ function getStatusUi(status: WhatsAppStatusResponse) {
         tone: "bg-rose-50 text-rose-700 border-rose-200",
       }
     case "disconnected":
+      if (!status.authenticated) {
+        return {
+          label: "بانتظار الباركود",
+          description: "يجري تجهيز باركود جديد أو تحديث الجلسة. انتظر قليلًا أو حدّث الباركود يدويًا.",
+          tone: "bg-slate-100 text-slate-700 border-slate-200",
+        }
+      }
+
       return {
         label: "انقطع الاتصال",
         description: "انقطعت الجلسة. حدّث الباركود أو أعد الربط.",
