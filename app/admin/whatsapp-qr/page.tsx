@@ -146,21 +146,6 @@ function getStatusUi(status: WhatsAppStatusResponse) {
   }
 }
 
-function shouldShowWorkerNote(status: WhatsAppStatusResponse) {
-  if (!status.lastError) {
-    return false
-  }
-
-  const normalizedError = String(status.lastError).trim().toUpperCase()
-  const transientConnectionNote = normalizedError === "WHATSAPP STATE CHANGED TO UNKNOWN" || normalizedError === "WHATSAPP STATE CHANGED TO DISCONNECTED"
-
-  if (transientConnectionNote && status.qrAvailable && status.status === "waiting_for_qr") {
-    return false
-  }
-
-  return true
-}
-
 function formatDateTime(value: string | null) {
   if (!value) return "-"
 
@@ -189,7 +174,6 @@ export default function WhatsAppQrPage() {
   const isConnected = status.ready && status.authenticated && status.status === "connected"
   const canDisconnect = status.ready && status.authenticated && status.status === "connected" && !isDisconnecting
   const autoRefreshIntervalMs = getAutoRefreshIntervalMs(status, imageFailed)
-  const showWorkerNote = shouldShowWorkerNote(status)
   const qrImageSrc = status.qrImageUrl
 
   const fetchStatus = async ({ silent = false }: { silent?: boolean } = {}) => {
@@ -438,11 +422,6 @@ export default function WhatsAppQrPage() {
                     <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#3453a7]" />
                     <p>إبقاء الهاتف متصلًا بالإنترنت يقلل احتمالات انقطاع الجلسة وفقدان الربط.</p>
                   </div>
-                  {showWorkerNote ? (
-                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700">
-                      آخر ملاحظة من العامل: {status.lastError}
-                    </div>
-                  ) : null}
                 </CardContent>
               </Card>
             </div>
