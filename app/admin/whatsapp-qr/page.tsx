@@ -53,7 +53,7 @@ function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: b
   }
 
   if (status.qrAvailable && status.status === "waiting_for_qr") {
-    return 0
+    return 5000
   }
 
   switch (status.status) {
@@ -63,7 +63,7 @@ function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: b
     case "starting":
       return 1200
     case "waiting_for_qr":
-      return 0
+      return 5000
     default:
       return status.workerOnline ? 5000 : 0
   }
@@ -106,6 +106,14 @@ function getStatusUi(status: WhatsAppStatusResponse) {
         description: "فشل التحقق من الجلسة، وقد تحتاج إلى مسح باركود جديد.",
       }
     case "disconnected":
+      if (!status.authenticated) {
+        return {
+          label: "بانتظار الباركود",
+          tone: "bg-slate-100 text-slate-700 border-slate-200",
+          description: "يجري تجهيز باركود جديد أو تحديث الجلسة. انتظر قليلًا أو حدّث الباركود يدويًا.",
+        }
+      }
+
       return {
         label: "انقطع الاتصال",
         tone: "bg-orange-50 text-orange-700 border-orange-200",
