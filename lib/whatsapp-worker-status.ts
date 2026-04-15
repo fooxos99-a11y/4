@@ -22,7 +22,24 @@ type WorkerStatusPayload = {
   qrValue?: string | null
 }
 
-export function getDefaultWhatsAppWorkerStatus() {
+type WhatsAppWorkerStatus = {
+  status: string
+  qrAvailable: boolean
+  ready: boolean
+  authenticated: boolean
+  lastUpdatedAt: string | null
+  lastHeartbeatAt: string | null
+  qrUpdatedAt: string | null
+  connectedAt: string | null
+  disconnectedAt: string | null
+  authFailedAt: string | null
+  lastError: string | null
+  workerOnline: boolean
+  qrImageUrl: string | null
+  qrValue: string | null
+}
+
+export function getDefaultWhatsAppWorkerStatus(): WhatsAppWorkerStatus {
   return {
     status: "not_started",
     qrAvailable: false,
@@ -99,7 +116,7 @@ function readLocalWhatsAppWorkerStatus() {
   }
 }
 
-function getStatusTimestamp(status: ReturnType<typeof getDefaultWhatsAppWorkerStatus>) {
+function getStatusTimestamp(status: WhatsAppWorkerStatus) {
   const value = status.lastUpdatedAt || status.lastHeartbeatAt || status.qrUpdatedAt || status.connectedAt || status.disconnectedAt || null
   return value ? new Date(value).getTime() : 0
 }
