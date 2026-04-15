@@ -52,8 +52,8 @@ function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: b
     return 1200
   }
 
-  if (status.qrAvailable) {
-    return 1200
+  if (status.qrAvailable && status.status === "waiting_for_qr") {
+    return 0
   }
 
   switch (status.status) {
@@ -63,7 +63,7 @@ function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: b
     case "starting":
       return 1200
     case "waiting_for_qr":
-      return 1500
+      return 0
     default:
       return status.workerOnline ? 5000 : 0
   }
@@ -185,15 +185,12 @@ export default function WhatsAppQrPage() {
   const [imageFailed, setImageFailed] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isRefreshingQr, setIsRefreshingQr] = useState(false)
-  const [qrImageVersion, setQrImageVersion] = useState(0)
   const statusUi = getStatusUi(status)
   const isConnected = status.ready && status.authenticated && status.status === "connected"
   const canDisconnect = status.ready && status.authenticated && status.status === "connected" && !isDisconnecting
   const autoRefreshIntervalMs = getAutoRefreshIntervalMs(status, imageFailed)
   const showWorkerNote = shouldShowWorkerNote(status)
   const qrImageSrc = status.qrImageUrl
-    ? `${status.qrImageUrl}${status.qrImageUrl.includes("?") ? "&" : "?"}v=${qrImageVersion}`
-    : null
 
   const fetchStatus = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
@@ -209,7 +206,6 @@ export default function WhatsAppQrPage() {
       const data = (await response.json()) as WhatsAppStatusResponse
       setStatus({ ...DEFAULT_STATUS, ...data })
       setImageFailed(false)
-      setQrImageVersion((current) => current + 1)
     } catch (error) {
       console.error("[whatsapp-qr] fetch status:", error)
     } finally {
