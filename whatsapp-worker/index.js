@@ -664,8 +664,21 @@ function isClientUnpairedState(clientState) {
   return normalizedState === "UNPAIRED" || normalizedState === "UNPAIRED_IDLE"
 }
 
+function hasRecentQrState() {
+  if (!workerState.qrUpdatedAt || workerState.authenticated) {
+    return false
+  }
+
+  const qrUpdatedAtTime = new Date(workerState.qrUpdatedAt).getTime()
+  if (!Number.isFinite(qrUpdatedAtTime)) {
+    return false
+  }
+
+  return Date.now() - qrUpdatedAtTime <= 5 * 60 * 1000
+}
+
 function hasPendingQrSession() {
-  return Boolean(fs.existsSync(QR_IMAGE_PATH) && !workerState.authenticated)
+  return Boolean((fs.existsSync(QR_IMAGE_PATH) || workerState.qrValue || hasRecentQrState()) && !workerState.authenticated)
 }
 
 async function verifyWhatsAppConnection() {
@@ -704,6 +717,7 @@ async function verifyWhatsAppConnection() {
         qrAvailable: true,
         ready: false,
         authenticated: false,
+        qrValue: workerState.qrValue,
         lastError: null,
       })
       return
@@ -735,8 +749,8 @@ async function verifyWhatsAppConnection() {
             : "disconnected",
       ready: false,
       authenticated: false,
-      qrAvailable: fs.existsSync(QR_IMAGE_PATH),
-      qrValue: null,
+      qrAvailable: fs.existsSync(QR_IMAGE_PATH) || Boolean(workerState.qrValue),
+      qrValue: workerState.qrValue,
       disconnectedAt: normalizedState === "OPENING" || normalizedState === "PAIRING" ? workerState.disconnectedAt : new Date().toISOString(),
       lastError: normalizedState === "OPENING" || normalizedState === "PAIRING" ? null : `WhatsApp state changed to ${normalizedState}`,
     })
@@ -1182,6 +1196,8 @@ async function bootstrap() {
     log("WhatsApp session authenticated.")
     persistWorkerState({
       status: "authenticating",
+      qrAvailable: false,
+      qrValue: null,
       authenticated: true,
       ready: false,
       lastError: null,
@@ -1247,6 +1263,7 @@ async function bootstrap() {
         qrAvailable: true,
         ready: false,
         authenticated: false,
+        qrValue: workerState.qrValue,
         lastError: null,
       })
       return
