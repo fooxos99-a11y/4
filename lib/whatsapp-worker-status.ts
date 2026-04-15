@@ -3,8 +3,50 @@ import path from "path"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { WHATSAPP_WORKER_STATE_SETTING_ID } from "@/lib/site-settings-constants"
 
-const STATUS_FILE_PATH = process.env.WHATSAPP_STATUS_FILE_PATH || path.join(process.cwd(), "whatsapp-worker", "status.json")
-const QR_IMAGE_PATH = process.env.WHATSAPP_QR_IMAGE_PATH || path.join(process.cwd(), "whatsapp-worker", "current-qr.png")
+function sanitizeInstanceSlug(value: string | undefined) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+function getSupabaseProjectRef(url: string | undefined) {
+  try {
+    const hostname = new URL(String(url || "")).hostname
+    return hostname.split(".")[0] || null
+  } catch {
+    return null
+  }
+}
+
+function getDefaultInstanceSlug() {
+  const explicitSlug = sanitizeInstanceSlug(process.env.WHATSAPP_INSTANCE_SLUG)
+  if (explicitSlug) {
+    return explicitSlug
+  }
+
+  const configuredClientId = sanitizeInstanceSlug(process.env.WHATSAPP_CLIENT_ID)
+  if (configuredClientId) {
+    return configuredClientId
+  }
+
+  const projectRef = sanitizeInstanceSlug(process.env.SUPABASE_PROJECT_REF || getSupabaseProjectRef(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL))
+  if (projectRef) {
+    return projectRef
+  }
+
+  const portToken = sanitizeInstanceSlug(process.env.PORT)
+  if (portToken) {
+    return `port-${portToken}`
+  }
+
+  return "default"
+}
+
+const INSTANCE_SLUG = getDefaultInstanceSlug()
+const STATUS_FILE_PATH = process.env.WHATSAPP_STATUS_FILE_PATH || path.join(process.cwd(), "whatsapp-worker", `status-${INSTANCE_SLUG}.json`)
+const QR_IMAGE_PATH = process.env.WHATSAPP_QR_IMAGE_PATH || path.join(process.cwd(), "whatsapp-worker", `current-qr-${INSTANCE_SLUG}.png`)
 const ONLINE_THRESHOLD_MS = 45000
 
 type WorkerStatusPayload = {
