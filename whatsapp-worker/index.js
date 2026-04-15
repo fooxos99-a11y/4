@@ -706,13 +706,18 @@ async function verifyWhatsAppConnection() {
       })
 
       if (!isResettingSession) {
-        void resetWhatsAppSession()
+        void resetWhatsAppSession({ clearSession: true, status: "fetching_qr" })
       }
       return
     }
 
     persistWorkerState({
-      status: normalizedState === "OPENING" || normalizedState === "PAIRING" ? "authenticating" : "disconnected",
+      status:
+        normalizedState === "OPENING" || normalizedState === "PAIRING"
+          ? "authenticating"
+          : normalizedState === "UNKNOWN"
+            ? "reconnecting"
+            : "disconnected",
       ready: false,
       authenticated: false,
       qrAvailable: fs.existsSync(QR_IMAGE_PATH),
@@ -720,6 +725,10 @@ async function verifyWhatsAppConnection() {
       disconnectedAt: normalizedState === "OPENING" || normalizedState === "PAIRING" ? workerState.disconnectedAt : new Date().toISOString(),
       lastError: normalizedState === "OPENING" || normalizedState === "PAIRING" ? null : `WhatsApp state changed to ${normalizedState}`,
     })
+
+    if ((normalizedState === "UNKNOWN" || normalizedState === "DISCONNECTED") && !isResettingSession) {
+      void resetWhatsAppSession({ clearSession: false, status: "reconnecting" })
+    }
   } catch (error) {
     log("Failed to verify live WhatsApp connection state.", error)
   }
@@ -790,7 +799,10 @@ async function readPendingSharedCommand() {
   }
 }
 
-async function resetWhatsAppSession() {
+async function resetWhatsAppSession(options = {}) {
+  const clearSession = options.clearSession !== false
+  const nextStatus = options.status || (clearSession ? "fetching_qr" : "reconnecting")
+
   if (isResettingSession) {
     return
   }
@@ -800,22 +812,24 @@ async function resetWhatsAppSession() {
   removeQrImage()
 
   persistWorkerState({
-    status: "fetching_qr",
+    status: nextStatus,
     qrAvailable: false,
     ready: false,
     authenticated: false,
     qrValue: null,
     disconnectedAt: new Date().toISOString(),
-    connectedAt: null,
-    authFailedAt: null,
+    connectedAt: clearSession ? null : workerState.connectedAt,
+    authFailedAt: clearSession ? null : workerState.authFailedAt,
     lastError: null,
   })
 
   try {
-    try {
-      await whatsappClient.logout()
-    } catch (error) {
-      log("WhatsApp logout returned an error during reset.", error)
+    if (clearSession) {
+      try {
+        await whatsappClient.logout()
+      } catch (error) {
+        log("WhatsApp logout returned an error during reset.", error)
+      }
     }
 
     try {
@@ -824,11 +838,13 @@ async function resetWhatsAppSession() {
       log("WhatsApp destroy returned an error during reset.", error)
     }
 
-    removeAuthSessionDirectory()
+    if (clearSession) {
+      removeAuthSessionDirectory()
+    }
     releaseWorkerLock()
 
     persistWorkerState({
-      status: "fetching_qr",
+      status: nextStatus,
       qrAvailable: false,
       ready: false,
       authenticated: false,
@@ -848,12 +864,12 @@ async function resetWhatsAppSession() {
   } catch (error) {
     log("Failed to reset WhatsApp session.", error)
     persistWorkerState({
-      status: "auth_failed",
+      status: clearSession ? "auth_failed" : "disconnected",
       qrAvailable: false,
       ready: false,
       authenticated: false,
       qrValue: null,
-      authFailedAt: new Date().toISOString(),
+      authFailedAt: clearSession ? new Date().toISOString() : workerState.authFailedAt,
       lastError: error instanceof Error ? error.message : String(error),
     })
   } finally {
@@ -872,7 +888,7 @@ function subscribeToCommands() {
 
     if (command.action === "disconnect") {
       log("Received disconnect command for WhatsApp worker.")
-      void resetWhatsAppSession()
+      void resetWhatsAppSession({ clearSession: true, status: "fetching_qr" })
     }
   }, 2000).unref()
 }
@@ -1202,7 +1218,7 @@ async function bootstrap() {
     })
 
     if (!isResettingSession) {
-      void resetWhatsAppSession()
+      void resetWhatsAppSession({ clearSession: true, status: "fetching_qr" })
     }
   })
 
@@ -1220,7 +1236,7 @@ async function bootstrap() {
     })
 
     if (!isResettingSession) {
-      void resetWhatsAppSession()
+      void resetWhatsAppSession({ clearSession: false, status: "reconnecting" })
     }
   })
 
