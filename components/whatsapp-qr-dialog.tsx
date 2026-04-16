@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { CheckCircle2, LogOut, QrCode, RefreshCw, Smartphone } from "lucide-react"
+import { AlertTriangle, CheckCircle2, LogOut, QrCode, RefreshCw, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SiteLoader } from "@/components/ui/site-loader"
@@ -44,6 +44,15 @@ const DEFAULT_STATUS: WhatsAppStatusResponse = {
   workerOnline: false,
   qrImageUrl: null,
 }
+
+const QR_WARNING_MESSAGE = [
+  "إذا كان الجوال غير متصل بالإنترنت أو خرجت جلسة واتساب من الأجهزة المرتبطة، سيتوقف الإرسال حتى تعود الحالة إلى تم الربط.",
+  "",
+  "لثبات الإرسال:",
+  "- أبق الجوال متصلاً بالإنترنت.",
+  "- لا تسجل خروجاً من واتساب ويب أو الأجهزة المرتبطة.",
+  "- إذا انقطعت الجلسة، امسح الباركود من جديد.",
+].join("\n")
 
 function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: boolean) {
   if (status.workerOnline && status.ready && status.authenticated && status.status === "connected") {
@@ -315,6 +324,10 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
     }
   }
 
+  const handleQrWarningClick = async () => {
+    await alertDialog(QR_WARNING_MESSAGE, "تنبيه مهم")
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md overflow-hidden rounded-[28px] border-[#d8e0f0] bg-white p-0" showCloseButton={false}>
@@ -360,7 +373,15 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
 
           <div className="space-y-4 p-5">
             {status.qrAvailable && qrImageSrc && !imageFailed ? (
-              <div className="flex justify-center rounded-[24px] border border-dashed border-[#cfdcf2] bg-[radial-gradient(circle_at_top,#ffffff_0%,#f8fbff_55%,#eef3ff_100%)] p-4">
+              <div className="relative flex justify-center rounded-[24px] border border-dashed border-[#cfdcf2] bg-[radial-gradient(circle_at_top,#ffffff_0%,#f8fbff_55%,#eef3ff_100%)] p-4">
+                <button
+                  type="button"
+                  onClick={handleQrWarningClick}
+                  className="absolute left-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-200 bg-amber-100 text-amber-700 shadow-sm transition hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                  aria-label="عرض تنبيه مهم عن ربط واتساب"
+                >
+                  <AlertTriangle className="h-5 w-5" />
+                </button>
                 <img
                   src={qrImageSrc}
                   alt="باركود واتساب"

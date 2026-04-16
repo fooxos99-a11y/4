@@ -43,6 +43,15 @@ const DEFAULT_STATUS: WhatsAppStatusResponse = {
   qrImageUrl: null,
 }
 
+const QR_WARNING_MESSAGE = [
+  "إذا كان الجوال غير متصل بالإنترنت أو خرجت جلسة واتساب من الأجهزة المرتبطة، سيتوقف الإرسال حتى تعود الحالة إلى تم الربط.",
+  "",
+  "لثبات الإرسال:",
+  "- أبق الجوال متصلاً بالإنترنت.",
+  "- لا تسجل خروجاً من واتساب ويب أو الأجهزة المرتبطة.",
+  "- إذا انقطعت الجلسة، امسح الباركود من جديد.",
+].join("\n")
+
 function getAutoRefreshIntervalMs(status: WhatsAppStatusResponse, imageFailed: boolean) {
   if (status.ready && status.authenticated && status.status === "connected") {
     return 4000
@@ -332,6 +341,10 @@ export default function WhatsAppQrPage() {
     }
   }
 
+  const handleQrWarningClick = async () => {
+    await alertDialog(QR_WARNING_MESSAGE, "تنبيه مهم")
+  }
+
   if (authLoading || !authVerified || isLoadingStatus) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#fafaf9]">
@@ -389,7 +402,15 @@ export default function WhatsAppQrPage() {
               <CardContent className="p-5 md:p-8">
                 {status.qrAvailable && qrImageSrc && !imageFailed ? (
                   <div className="space-y-4">
-                    <div className="mx-auto flex max-w-[430px] items-center justify-center rounded-[28px] border border-dashed border-[#cfdcf2] bg-[radial-gradient(circle_at_top,#ffffff_0%,#f8fbff_55%,#eef3ff_100%)] p-5 shadow-inner">
+                    <div className="relative mx-auto flex max-w-[430px] items-center justify-center rounded-[28px] border border-dashed border-[#cfdcf2] bg-[radial-gradient(circle_at_top,#ffffff_0%,#f8fbff_55%,#eef3ff_100%)] p-5 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={handleQrWarningClick}
+                        className="absolute left-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-amber-200 bg-amber-100 text-amber-700 shadow-sm transition hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                        aria-label="عرض تنبيه مهم عن ربط واتساب"
+                      >
+                        <AlertTriangle className="h-5 w-5" />
+                      </button>
                       <img
                         src={qrImageSrc}
                         alt="باركود واتساب"
