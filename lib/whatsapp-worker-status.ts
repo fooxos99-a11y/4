@@ -1,9 +1,9 @@
 import fs from "fs"
 import path from "path"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { WHATSAPP_WORKER_STATE_SETTING_ID } from "@/lib/site-settings-constants"
+import { WHATSAPP_WORKER_STATE_SETTING_ID } from "@/lib/whatsapp-site-config"
 
-function sanitizeInstanceSlug(value: string | undefined) {
+function sanitizeInstanceSlug(value: string | null | undefined) {
   return String(value || "")
     .trim()
     .toLowerCase()

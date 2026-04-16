@@ -1,185 +1,96 @@
-# نشر الموقع الرابع على VPS واحد
+# نشر الموقع الرابع على VPS مع Vercel
 
-هذا الدليل يشغّل `site-4` فقط على VPS واحد، مع إبقاء عامل واتساب يعمل دائمًا عبر `pm2`.
+هذا الدليل يشغّل عامل واتساب للموقع الرابع على VPS مع إبقاء تطبيق Next.js نفسه على Vercel.
 
-## بيانات الخادم
+إذا كان `https://khalid9.vercel.app` يعمل أصلًا على Vercel، فلا تشغّل نسخة ثانية من التطبيق على نفس الـ VPS. المطلوب فقط أن يعمل `worker:whatsapp` بشكل دائم ويكتب حالته في نفس مشروع Supabase الذي يقرأ منه الموقع.
 
-- `IP`: `167.86.113.166`
-- التطبيق سيعمل داخليًا على المنفذ `3004`
-- يفضّل عرض الموقع خارجيًا عبر `nginx` على المنفذ `80` أو الدومين لاحقًا
+## البيانات الحالية
 
-## 1. أول دخول إلى الخادم
+- `Vercel`: `https://khalid9.vercel.app`
+- `Supabase project`: `xhfddytzyxplsuxdduqb`
+- `VPS app path`: `/opt/khalid-app`
+- `PM2 worker name`: `khalid-whatsapp-worker`
 
-من جهازك المحلي:
+## 1. ملف البيئة
+
+ابدأ من هذا القالب المحلي:
+
+- `deploy/vps/site-4.env.example`
+
+ثم انسخه على الخادم إلى:
 
 ```bash
-ssh root@167.86.113.166
+/opt/khalid-app/.env.local
 ```
 
-مهم:
+المهم هنا أن تكون القيم التالية خاصة بهذا الموقع فقط:
 
-- غيّر كلمة المرور مباشرة بعد أول دخول
-- يفضّل إضافة `SSH key` وإيقاف الاعتماد على كلمة المرور لاحقًا
+- `WHATSAPP_CLIENT_ID`
+- `WHATSAPP_AUTH_DIR`
+- `WHATSAPP_STATUS_FILE_PATH`
+- `WHATSAPP_QR_IMAGE_PATH`
+- `WHATSAPP_COMMAND_FILE_PATH`
+- `WHATSAPP_LOCK_FILE_PATH`
 
-## 2. تثبيت المتطلبات
+هذه القيم هي التي تمنع مشاركة نفس جلسة واتساب مع أي موقع آخر على نفس الخادم.
 
-نفّذ على الـ VPS:
+## 2. تثبيت الحزم
+
+على الـ VPS:
+
+```bash
+cd /opt/khalid-app
+pnpm install
+```
+
+إذا كان Chromium غير موجود، ثبّته:
 
 ```bash
 apt update
-apt install -y git nginx chromium
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install -y nodejs
-npm install -g pnpm pm2
+apt install -y chromium
 ```
 
-تحقق:
+## 3. تشغيل العامل عبر PM2
+
+إذا لم تكن العملية موجودة:
 
 ```bash
-node -v
-pnpm -v
-pm2 -v
-chromium --version
-```
-
-## 3. رفع المشروع إلى الخادم
-
-اختر مجلد تشغيل ثابت:
-
-```bash
-mkdir -p /var/www/habib
-cd /var/www/habib
-```
-
-إذا كنت سترفعه عبر Git:
-
-```bash
-git clone <REPO_URL> app
-cd /var/www/habib/app
-```
-
-إذا كنت سترفعه يدويًا من جهازك، ضع الملفات داخل:
-
-```bash
-/var/www/habib/app
-```
-
-## 4. نقل ملف البيئة الخاص بالموقع الرابع
-
-هذا الملف جاهز محليًا هنا:
-
-- `deploy/vps/sites/site-4/site.env`
-
-انسخه إلى نفس المسار داخل الخادم:
-
-```bash
-/var/www/habib/app/deploy/vps/sites/site-4/site.env
-```
-
-ملاحظة:
-
-- مفاتيح `Supabase` وأسرار الجلسة تم تجهيزها محليًا
-- إذا كنت ستستخدم `Web Push` أو `WhatsApp Cloud API` لاحقًا، أكمل الحقول placeholder قبل الإنتاج الكامل
-
-## 5. تثبيت الحزم وبناء المشروع
-
-على الـ VPS داخل المشروع:
-
-```bash
-cd /var/www/habib/app
-pnpm install
-pnpm build
-chmod +x ./scripts/vps/run-site.sh
-```
-
-## 6. تشغيل الموقع وعامل واتساب عبر PM2
-
-شغّل الموقع الرابع فقط:
-
-```bash
-cd /var/www/habib/app
-pm2 start ./scripts/vps/run-site.sh --name habib-site4-app --interpreter /bin/bash -- app ./deploy/vps/sites/site-4/site.env
-pm2 start ./scripts/vps/run-site.sh --name habib-site4-worker --interpreter /bin/bash -- worker ./deploy/vps/sites/site-4/site.env
+cd /opt/khalid-app
+pm2 start pnpm --name khalid-whatsapp-worker -- worker:whatsapp
 pm2 save
-pm2 startup
 ```
 
-تحقق من الحالة:
+إذا كانت العملية موجودة أصلًا وتحتاج فقط تحميل البيئة الجديدة أو الكود الجديد:
 
 ```bash
-pm2 status
-pm2 logs habib-site4-app
-pm2 logs habib-site4-worker
+cd /opt/khalid-app
+pm2 restart khalid-whatsapp-worker --update-env
 ```
 
-## 7. إعداد Nginx
+## 4. التحقق
 
-أنشئ ملف إعداد:
+على الخادم:
 
 ```bash
-nano /etc/nginx/sites-available/habib-site4
+pm2 describe khalid-whatsapp-worker
+pm2 logs khalid-whatsapp-worker --lines 100
 ```
 
-وضع هذا المحتوى:
-
-```nginx
-server {
-  listen 80;
-  server_name 167.86.113.166;
-
-  location / {
-    proxy_pass http://127.0.0.1:3004;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection upgrade;
-  }
-}
-```
-
-ثم فعّل الإعداد:
+ومن الخارج:
 
 ```bash
-ln -s /etc/nginx/sites-available/habib-site4 /etc/nginx/sites-enabled/habib-site4
-nginx -t
-systemctl reload nginx
+curl https://khalid9.vercel.app/api/whatsapp/status
+curl -I https://khalid9.vercel.app/api/whatsapp/qr
 ```
 
-## 8. فحص واتساب
+المتوقع عند نجاح التشغيل:
 
-بعد تشغيل العامل، تحقق:
+- `workerOnline: true`
+- `status: waiting_for_qr` أو `connected`
+- مسار `/api/whatsapp/qr` يرجع `200` عندما يوجد `qrValue`
 
-```bash
-curl http://127.0.0.1:3004/api/whatsapp/status
-```
+## 5. ملاحظات العزل
 
-وللوصول إلى QR من المتصفح:
-
-```text
-http://167.86.113.166/api/whatsapp/qr
-```
-
-## 9. أوامر الصيانة
-
-إعادة تشغيل:
-
-```bash
-pm2 restart habib-site4-app
-pm2 restart habib-site4-worker
-```
-
-إيقاف مؤقت:
-
-```bash
-pm2 stop habib-site4-app
-pm2 stop habib-site4-worker
-```
-
-متابعة السجلات:
-
-```bash
-pm2 logs habib-site4-app --lines 100
-pm2 logs habib-site4-worker --lines 100
-```
+- لا تستخدم نفس مشروع Supabase الخاص بموقع Habib إذا كنت تريد عزلًا كاملًا بين الموقعين.
+- لا تعِد استخدام نفس `WHATSAPP_CLIENT_ID` أو نفس ملفات الجلسة.
+- هذا المستودع يدعم الآن إنشاء أسماء وملفات افتراضية مختلفة بحسب `WHATSAPP_CLIENT_ID` أو مشروع Supabase حتى لو كانت البيئة ناقصة.

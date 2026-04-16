@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { requireRoles } from "@/lib/auth/guards"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { readWhatsAppWorkerStatus } from "@/lib/whatsapp-worker-status"
-import { WHATSAPP_WORKER_COMMAND_SETTING_ID } from "@/lib/site-settings-constants"
+import { WHATSAPP_WORKER_COMMAND_SETTING_ID } from "@/lib/whatsapp-site-config"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0

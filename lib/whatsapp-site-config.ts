@@ -1,0 +1,5 @@
+export const WHATSAPP_QUEUE_TABLE = process.env.WHATSAPP_QUEUE_TABLE || "whatsapp_queue"
+export const WHATSAPP_HISTORY_TABLE = process.env.WHATSAPP_HISTORY_TABLE || "whatsapp_messages"
+export const WHATSAPP_REPLIES_TABLE = process.env.WHATSAPP_REPLIES_TABLE || "whatsapp_replies"
+export const WHATSAPP_WORKER_STATE_SETTING_ID = process.env.WHATSAPP_WORKER_STATE_SETTING_ID || "whatsapp_worker_state"
+export const WHATSAPP_WORKER_COMMAND_SETTING_ID = process.env.WHATSAPP_WORKER_COMMAND_SETTING_ID || "whatsapp_worker_command"

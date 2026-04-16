@@ -79,6 +79,8 @@ const QUEUE_POLL_INTERVAL_MS = Number(process.env.WHATSAPP_QUEUE_POLL_INTERVAL_M
 const IS_LINUX = process.platform === "linux"
 const HEARTBEAT_INTERVAL_MS = Number(process.env.WHATSAPP_HEARTBEAT_INTERVAL_MS || 15000)
 const CONNECTION_CHECK_INTERVAL_MS = Number(process.env.WHATSAPP_CONNECTION_CHECK_INTERVAL_MS || 10000)
+const STARTUP_TIMEOUT_MS = Number(process.env.WHATSAPP_STARTUP_TIMEOUT_MS || 180000)
+const IS_PM2_MANAGED = Boolean(process.env.pm_id || process.env.PM2_HOME)
 
 const PUPPETEER_ARGS = IS_LINUX
   ? [
@@ -91,6 +93,45 @@ const PUPPETEER_ARGS = IS_LINUX
       "--no-zygote",
     ]
   : ["--no-first-run"]
+
+function getCandidateBrowserPaths() {
+  const programFiles = process.env.PROGRAMFILES || "C:\\Program Files"
+  const programFilesX86 = process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)"
+  const localAppData = process.env.LOCALAPPDATA || ""
+
+  return [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    process.env.CHROME_PATH,
+    process.env.CHROMIUM_PATH,
+    process.env.GOOGLE_CHROME_BIN,
+    path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(localAppData, "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(programFiles, "Chromium", "Application", "chrome.exe"),
+    path.join(programFilesX86, "Chromium", "Application", "chrome.exe"),
+    path.join(programFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
+    path.join(programFilesX86, "Microsoft", "Edge", "Application", "msedge.exe"),
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/snap/bin/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  ].filter(Boolean)
+}
+
+function resolveBrowserExecutablePath() {
+  for (const candidatePath of getCandidateBrowserPaths()) {
+    if (fs.existsSync(candidatePath)) {
+      return candidatePath
+    }
+  }
+
+  return undefined
+}
+
+const BROWSER_EXECUTABLE_PATH = resolveBrowserExecutablePath()
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error(
@@ -149,11 +190,14 @@ let hasWorkerLock = false
 let sentMessagesSincePause = 0
 let isSyncingIncomingMessages = false
 let isPersistingSharedState = false
+let startupWatchdog = null
 let workerState = {
   status: "starting",
   qrAvailable: false,
   ready: false,
   authenticated: false,
+  pid: process.pid,
+  startedAt: new Date().toISOString(),
   lastUpdatedAt: new Date().toISOString(),
   lastHeartbeatAt: new Date().toISOString(),
   qrUpdatedAt: null,
@@ -161,6 +205,7 @@ let workerState = {
   disconnectedAt: null,
   authFailedAt: null,
   lastError: null,
+  lastResetReason: null,
   qrValue: null,
 }
 
@@ -171,7 +216,7 @@ const whatsappClient = new Client({
   }),
   puppeteer: {
     headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    executablePath: BROWSER_EXECUTABLE_PATH,
     args: PUPPETEER_ARGS,
   },
 })
@@ -185,6 +230,10 @@ function log(message, extra) {
   }
 
   console.log(`[${timestamp}] ${message}`, extra)
+}
+
+if (BROWSER_EXECUTABLE_PATH) {
+  log(`Using browser executable: ${BROWSER_EXECUTABLE_PATH}`)
 }
 
 function sleep(ms) {
@@ -657,6 +706,58 @@ function ensureCommandDirectory() {
   }
 }
 
+function clearStartupWatchdog() {
+  if (startupWatchdog) {
+    clearTimeout(startupWatchdog)
+    startupWatchdog = null
+  }
+}
+
+function requestProcessRestart(reason, exitCode = 0) {
+  clearStartupWatchdog()
+
+  if (IS_PM2_MANAGED) {
+    log(`Restarting WhatsApp worker through PM2 supervisor. Reason: ${reason}`)
+  } else {
+    const detachedWorker = spawn(process.execPath, [__filename], {
+      cwd: __dirname,
+      env: process.env,
+      detached: true,
+      stdio: "ignore",
+    })
+
+    detachedWorker.unref()
+  }
+
+  process.exit(exitCode)
+}
+
+function scheduleStartupWatchdog() {
+  clearStartupWatchdog()
+
+  startupWatchdog = setTimeout(() => {
+    if (isResettingSession || workerState.ready || workerState.authenticated || workerState.qrAvailable || workerState.qrValue) {
+      return
+    }
+
+    log(`WhatsApp worker startup watchdog expired after ${STARTUP_TIMEOUT_MS}ms.`)
+    persistWorkerState({
+      status: "startup_failed",
+      ready: false,
+      authenticated: false,
+      qrAvailable: false,
+      qrValue: null,
+      authFailedAt: new Date().toISOString(),
+      lastError: `Startup timed out after ${STARTUP_TIMEOUT_MS}ms.`,
+      lastResetReason: "startup_timeout",
+    })
+    releaseWorkerLock()
+    requestProcessRestart("startup timeout", 1)
+  }, STARTUP_TIMEOUT_MS)
+
+  startupWatchdog.unref()
+}
+
 async function persistWorkerStateToSupabase() {
   if (isPersistingSharedState) {
     return
@@ -684,6 +785,8 @@ function persistWorkerState(partialState = {}) {
   workerState = {
     ...workerState,
     ...partialState,
+    pid: process.pid,
+    startedAt: workerState.startedAt || now,
     lastUpdatedAt: now,
     lastHeartbeatAt: partialState.lastHeartbeatAt || now,
   }
@@ -788,7 +891,7 @@ async function verifyWhatsAppConnection() {
       })
 
       if (!isResettingSession) {
-        void resetWhatsAppSession({ clearSession: true, status: "fetching_qr" })
+        void resetWhatsAppSession({ clearSession: true, status: "fetching_qr", reason: `state_${normalizedState.toLowerCase()}` })
       }
       return
     }
@@ -812,6 +915,7 @@ async function verifyWhatsAppConnection() {
       void resetWhatsAppSession({
         clearSession: shouldForceFreshQrFromState(normalizedState) && !hasPendingQrSession(),
         status: shouldForceFreshQrFromState(normalizedState) && !hasPendingQrSession() ? "fetching_qr" : "reconnecting",
+        reason: `state_${normalizedState.toLowerCase()}`,
       })
     }
   } catch (error) {
@@ -887,6 +991,7 @@ async function readPendingSharedCommand() {
 async function resetWhatsAppSession(options = {}) {
   const clearSession = options.clearSession !== false
   const nextStatus = options.status || (clearSession ? "fetching_qr" : "reconnecting")
+  const resetReason = options.reason || (clearSession ? "reset_with_session_clear" : "reset_without_session_clear")
 
   if (isResettingSession) {
     return
@@ -894,6 +999,7 @@ async function resetWhatsAppSession(options = {}) {
 
   isResettingSession = true
   isWhatsappReady = false
+  clearStartupWatchdog()
   removeQrImage()
 
   persistWorkerState({
@@ -906,6 +1012,7 @@ async function resetWhatsAppSession(options = {}) {
     connectedAt: clearSession ? null : workerState.connectedAt,
     authFailedAt: clearSession ? null : workerState.authFailedAt,
     lastError: null,
+    lastResetReason: resetReason,
   })
 
   try {
@@ -935,17 +1042,10 @@ async function resetWhatsAppSession(options = {}) {
       authenticated: false,
       qrValue: null,
       lastError: null,
+      lastResetReason: resetReason,
     })
 
-    const detachedWorker = spawn(process.execPath, [__filename], {
-      cwd: __dirname,
-      env: process.env,
-      detached: true,
-      stdio: "ignore",
-    })
-
-    detachedWorker.unref()
-    process.exit(0)
+    requestProcessRestart(resetReason, 0)
   } catch (error) {
     log("Failed to reset WhatsApp session.", error)
     persistWorkerState({
@@ -956,6 +1056,7 @@ async function resetWhatsAppSession(options = {}) {
       qrValue: null,
       authFailedAt: clearSession ? new Date().toISOString() : workerState.authFailedAt,
       lastError: error instanceof Error ? error.message : String(error),
+      lastResetReason: `${resetReason}_failed`,
     })
   } finally {
     isResettingSession = false
@@ -973,7 +1074,7 @@ function subscribeToCommands() {
 
     if (command.action === "disconnect") {
       log("Received disconnect command for WhatsApp worker.")
-      void resetWhatsAppSession({ clearSession: true, status: "fetching_qr" })
+      void resetWhatsAppSession({ clearSession: true, status: "fetching_qr", reason: "disconnect_command" })
     }
   }, 2000).unref()
 }
@@ -1199,7 +1300,10 @@ async function bootstrap() {
     ready: false,
     authenticated: false,
     lastError: null,
+    lastResetReason: null,
   })
+
+  scheduleStartupWatchdog()
 
   setInterval(() => {
     persistWorkerState({ lastHeartbeatAt: new Date().toISOString() })
@@ -1226,6 +1330,7 @@ async function bootstrap() {
         },
       })
       log(`QR image saved to ${QR_IMAGE_PATH}`)
+      clearStartupWatchdog()
       persistWorkerState({
         status: "waiting_for_qr",
         qrAvailable: true,
@@ -1250,6 +1355,7 @@ async function bootstrap() {
 
   whatsappClient.on("authenticated", () => {
     log("WhatsApp session authenticated.")
+    clearStartupWatchdog()
     persistWorkerState({
       status: "authenticating",
       qrAvailable: false,
@@ -1263,6 +1369,7 @@ async function bootstrap() {
   whatsappClient.on("ready", async () => {
     isWhatsappReady = true
     log("WhatsApp client is ready.")
+    clearStartupWatchdog()
     removeQrImage()
     persistWorkerState({
       status: "connected",
@@ -1305,7 +1412,7 @@ async function bootstrap() {
     })
 
     if (!isResettingSession) {
-      void resetWhatsAppSession({ clearSession: true, status: "fetching_qr" })
+      void resetWhatsAppSession({ clearSession: true, status: "fetching_qr", reason: "auth_failure" })
     }
   })
 
@@ -1340,6 +1447,7 @@ async function bootstrap() {
       void resetWhatsAppSession({
         clearSession: shouldForceFreshQr,
         status: shouldForceFreshQr ? "fetching_qr" : "reconnecting",
+        reason: `disconnected_${String(reason || "unknown").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_") || "unknown"}`,
       })
     }
   })
@@ -1360,6 +1468,7 @@ async function bootstrap() {
 bootstrap().catch((error) => {
   const startupErrorMessage = error instanceof Error ? error.message : String(error)
   const missingBrowser = /Could not find Chrome|Could not find Chromium|Browser was not found/i.test(startupErrorMessage)
+  clearStartupWatchdog()
 
   persistWorkerState({
     status: missingBrowser ? "browser_missing" : "startup_failed",
@@ -1369,6 +1478,7 @@ bootstrap().catch((error) => {
     qrValue: null,
     authFailedAt: new Date().toISOString(),
     lastError: startupErrorMessage,
+    lastResetReason: missingBrowser ? "browser_missing" : "startup_crash",
   })
 
   log("Worker crashed during startup.", error)
@@ -1378,6 +1488,7 @@ bootstrap().catch((error) => {
 
 process.on("SIGINT", async () => {
   log("SIGINT received, shutting down worker.")
+  clearStartupWatchdog()
 
   try {
     await whatsappClient.destroy()
@@ -1389,6 +1500,7 @@ process.on("SIGINT", async () => {
 
 process.on("SIGTERM", async () => {
   log("SIGTERM received, shutting down worker.")
+  clearStartupWatchdog()
 
   try {
     await whatsappClient.destroy()
@@ -1399,5 +1511,40 @@ process.on("SIGTERM", async () => {
 })
 
 process.on("exit", () => {
+  clearStartupWatchdog()
   releaseWorkerLock()
+})
+
+process.on("unhandledRejection", (error) => {
+  const message = error instanceof Error ? error.message : String(error)
+  log("Unhandled promise rejection in WhatsApp worker.", error)
+  persistWorkerState({
+    status: "startup_failed",
+    ready: false,
+    authenticated: false,
+    qrAvailable: false,
+    qrValue: null,
+    authFailedAt: new Date().toISOString(),
+    lastError: message,
+    lastResetReason: "unhandled_rejection",
+  })
+  releaseWorkerLock()
+  requestProcessRestart("unhandled rejection", 1)
+})
+
+process.on("uncaughtException", (error) => {
+  const message = error instanceof Error ? error.message : String(error)
+  log("Uncaught exception in WhatsApp worker.", error)
+  persistWorkerState({
+    status: "startup_failed",
+    ready: false,
+    authenticated: false,
+    qrAvailable: false,
+    qrValue: null,
+    authFailedAt: new Date().toISOString(),
+    lastError: message,
+    lastResetReason: "uncaught_exception",
+  })
+  releaseWorkerLock()
+  requestProcessRestart("uncaught exception", 1)
 })
