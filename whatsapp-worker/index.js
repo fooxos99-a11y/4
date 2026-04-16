@@ -58,6 +58,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABAS
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const QUEUE_TABLE = process.env.WHATSAPP_QUEUE_TABLE || "whatsapp_queue"
 const HISTORY_TABLE = process.env.WHATSAPP_HISTORY_TABLE || "whatsapp_messages"
+const REPLIES_TABLE = process.env.WHATSAPP_REPLIES_TABLE || "whatsapp_replies"
 const AUTH_DIR = process.env.WHATSAPP_AUTH_DIR || path.join(__dirname, `.wwebjs_auth_${INSTANCE_SLUG}`)
 const QR_IMAGE_PATH = process.env.WHATSAPP_QR_IMAGE_PATH || path.join(__dirname, `current-qr-${INSTANCE_SLUG}.png`)
 const STATUS_FILE_PATH = process.env.WHATSAPP_STATUS_FILE_PATH || path.join(__dirname, `status-${INSTANCE_SLUG}.json`)
@@ -321,7 +322,7 @@ async function updateSentMessageMetadata(id, whatsappMessageId) {
   }
 
   const { error } = await supabase
-    .from("whatsapp_messages")
+    .from(HISTORY_TABLE)
     .update({ message_id: whatsappMessageId })
     .eq("id", id)
 
@@ -363,7 +364,7 @@ async function resolveOriginalMessageRecordId(message) {
     }
 
     const { data, error } = await supabase
-      .from("whatsapp_messages")
+      .from(HISTORY_TABLE)
       .select("id, phone_number, created_at")
       .eq("message_id", quotedMessageId)
       .maybeSingle()
@@ -385,7 +386,7 @@ async function resolveOriginalMessageRecordIdByPhoneAndTime(chatId, messageTimes
 
     if (chatIdToken) {
       const { data: lidRows, error: lidError } = await supabase
-        .from("whatsapp_messages")
+        .from(HISTORY_TABLE)
         .select("id, phone_number, created_at, message_id")
         .ilike("message_id", `%_${chatIdToken}_%`)
         .order("created_at", { ascending: false })
@@ -404,7 +405,7 @@ async function resolveOriginalMessageRecordIdByPhoneAndTime(chatId, messageTimes
     const normalizedPhone = normalizePhoneNumber(chatId)
 
     const { data, error } = await supabase
-      .from("whatsapp_messages")
+      .from(HISTORY_TABLE)
       .select("id, phone_number, created_at")
       .eq("phone_number", normalizedPhone)
       .order("created_at", { ascending: false })
@@ -463,7 +464,7 @@ async function saveIncomingReply(message) {
   }
 
   const { data: existingReply, error: existingReplyError } = await supabase
-    .from("whatsapp_replies")
+    .from(REPLIES_TABLE)
     .select("id")
     .eq("original_message_id", originalMessageRecord.id)
     .limit(1)
@@ -491,7 +492,7 @@ async function saveIncomingReply(message) {
     media_base64: mediaPayload.mediaBase64,
   }
 
-  const { error } = await supabase.from("whatsapp_replies").insert(payload)
+  const { error } = await supabase.from(REPLIES_TABLE).insert(payload)
 
   if (error) {
     if (error.code === "PGRST204" || error.code === "42703") {
@@ -504,7 +505,7 @@ async function saveIncomingReply(message) {
         original_message_id: payload.original_message_id,
       }
 
-      const { error: fallbackError } = await supabase.from("whatsapp_replies").insert(fallbackPayload)
+      const { error: fallbackError } = await supabase.from(REPLIES_TABLE).insert(fallbackPayload)
 
       if (!fallbackError || fallbackError.code === "23505") {
         return
@@ -723,6 +724,16 @@ function hasPendingQrSession() {
   return Boolean((fs.existsSync(QR_IMAGE_PATH) || workerState.qrValue || hasRecentQrState()) && !workerState.authenticated)
 }
 
+function shouldForceFreshQrFromState(clientState) {
+  const normalizedState = String(clientState || "").trim().toUpperCase()
+  return normalizedState === "UNKNOWN"
+}
+
+function shouldForceFreshQrFromReason(reason) {
+  const normalizedReason = String(reason || "").trim().toUpperCase()
+  return normalizedReason.includes("UNKNOWN")
+}
+
 async function verifyWhatsAppConnection() {
   if (isResettingSession || typeof whatsappClient.getState !== "function") {
     return
@@ -798,7 +809,10 @@ async function verifyWhatsAppConnection() {
     })
 
     if ((normalizedState === "UNKNOWN" || normalizedState === "DISCONNECTED") && !isResettingSession) {
-      void resetWhatsAppSession({ clearSession: false, status: "reconnecting" })
+      void resetWhatsAppSession({
+        clearSession: shouldForceFreshQrFromState(normalizedState) && !hasPendingQrSession(),
+        status: shouldForceFreshQrFromState(normalizedState) && !hasPendingQrSession() ? "fetching_qr" : "reconnecting",
+      })
     }
   } catch (error) {
     log("Failed to verify live WhatsApp connection state.", error)
@@ -997,7 +1011,7 @@ async function updateQueueStatus(id, status, errorMessage = null) {
   }
 
   const { error: historyError } = await supabase
-    .from("whatsapp_messages")
+    .from(HISTORY_TABLE)
     .update(payload)
     .eq("id", id)
 
@@ -1322,7 +1336,11 @@ async function bootstrap() {
     })
 
     if (!isResettingSession) {
-      void resetWhatsAppSession({ clearSession: false, status: "reconnecting" })
+      const shouldForceFreshQr = shouldForceFreshQrFromReason(reason) && !hasPendingQrSession()
+      void resetWhatsAppSession({
+        clearSession: shouldForceFreshQr,
+        status: shouldForceFreshQr ? "fetching_qr" : "reconnecting",
+      })
     }
   })
 
