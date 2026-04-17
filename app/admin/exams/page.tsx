@@ -970,6 +970,10 @@ export default function AdminExamsPage() {
       <Header />
       <main className="px-4 py-8 md:px-6 md:py-10">
         <div className="mx-auto max-w-7xl space-y-6">
+          <div className="text-right">
+            <h1 className="text-3xl font-black tracking-tight text-[#1a2332] md:text-4xl">إدارة الاختبارات</h1>
+          </div>
+
           {!isWhatsAppStatusLoading && !isWhatsAppReady ? (
             <div className="text-right text-sm font-black leading-7 text-[#b91c1c]">
               واتس اب غير مربوط حاليا، إربطه بالباركود لتتمكن من الإرسال الى اولياء الأمور.
