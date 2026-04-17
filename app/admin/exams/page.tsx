@@ -1043,13 +1043,7 @@ export default function AdminExamsPage() {
                           const isSending = sendingScheduleStudentId === row.student.id
                           const hasAvailablePortions = row.availablePortions.length > 0
                           const cannotSend = !row.draftPortionNumber || !row.draftExamDate
-                          const actionLabel = isSending
-                            ? ""
-                            : hasAvailablePortions
-                              ? "إرسال"
-                              : row.scheduledCount > 0
-                                ? "اكتملت الجدولة"
-                                : "لا يوجد محفوظ, فقط"
+                          const actionLabel = isSending ? "" : "إرسال"
 
                           return (
                             <TableRow key={`schedule-row-${row.student.id}`}>
@@ -1069,7 +1063,7 @@ export default function AdminExamsPage() {
                                 ) : row.scheduledCount > 0 ? (
                                   <div className="text-sm font-bold text-[#64748b]">تمت جدولة كل {portionUnitLabel === "الحزب" ? "الأحزاب" : "الأجزاء"} المتاحة</div>
                                 ) : (
-                                  <div className="text-sm font-bold text-[#64748b]">لا يوجد محفوظ, فقط</div>
+                                  <div className="text-sm font-bold text-[#64748b]">لا يوجد محفوظ</div>
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
