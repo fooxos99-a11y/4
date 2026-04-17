@@ -342,7 +342,19 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
                 <p className="text-sm font-bold text-[#64748b]">يجب أن يكون الهاتف متصل بالإنترنت أثناء إرسال الرسائل</p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                {status.qrAvailable ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleQrWarningClick}
+                    className="h-9 rounded-2xl border-[#cfe0ff] bg-[#eef5ff] px-2.5 text-xs font-black text-[#3453a7] hover:bg-[#e2eeff] hover:text-[#3453a7]"
+                    aria-label="عرض تنبيه مهم عن ربط واتساب"
+                  >
+                    <AlertTriangle className="me-1.5 h-3.5 w-3.5" />
+                    تنبيه مهم
+                  </Button>
+                ) : null}
                 {!status.ready ? (
                   <Button
                     type="button"
@@ -374,14 +386,6 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
           <div className="space-y-4 p-5">
             {status.qrAvailable && qrImageSrc && !imageFailed ? (
               <div className="relative flex justify-center rounded-[24px] border border-dashed border-[#cfdcf2] bg-[radial-gradient(circle_at_top,#ffffff_0%,#f8fbff_55%,#eef3ff_100%)] p-4">
-                <button
-                  type="button"
-                  onClick={handleQrWarningClick}
-                  className="absolute left-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-amber-200 bg-amber-100 text-amber-700 shadow-sm transition hover:bg-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-300"
-                  aria-label="عرض تنبيه مهم عن ربط واتساب"
-                >
-                  <AlertTriangle className="h-5 w-5" />
-                </button>
                 <img
                   src={qrImageSrc}
                   alt="باركود واتساب"
