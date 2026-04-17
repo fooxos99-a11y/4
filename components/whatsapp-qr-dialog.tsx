@@ -347,12 +347,12 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
                   <Button
                     type="button"
                     variant="outline"
+                    size="icon"
                     onClick={handleQrWarningClick}
-                    className="h-9 rounded-2xl border-[#cfe0ff] bg-[#eef5ff] px-2.5 text-xs font-black text-[#3453a7] hover:bg-[#e2eeff] hover:text-[#3453a7]"
+                    className="h-9 w-9 rounded-2xl border-[#cfe0ff] bg-[#eef5ff] text-[#3453a7] hover:bg-[#e2eeff] hover:text-[#3453a7]"
                     aria-label="عرض تنبيه مهم عن ربط واتساب"
                   >
-                    <AlertTriangle className="me-1.5 h-3.5 w-3.5" />
-                    تنبيه مهم
+                    <AlertTriangle className="h-3.5 w-3.5" />
                   </Button>
                 ) : null}
                 {!status.ready ? (
