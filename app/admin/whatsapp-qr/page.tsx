@@ -376,10 +376,17 @@ export default function WhatsAppQrPage() {
                   onClick={handleRefreshQr}
                   disabled={isLoadingStatus || isRefreshingQr}
                   variant="outline"
-                  className="h-11 rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#3453a7] hover:bg-[#f8fbff] disabled:opacity-60"
+                  className="h-11 w-[148px] rounded-2xl border-[#d7e3f2] bg-white px-5 text-sm font-black text-[#3453a7] hover:bg-[#f8fbff] disabled:opacity-60"
+                  aria-label={isRefreshingQr ? "جاري تحديث الباركود" : "تحديث الباركود"}
                 >
-                  <RefreshCw className={`me-2 h-4 w-4 ${isLoadingStatus || isRefreshingQr ? "animate-spin" : ""}`} />
-                  {isRefreshingQr ? "جاري تحديث الباركود..." : "تحديث الباركود"}
+                  {isRefreshingQr ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <RefreshCw className="me-2 h-4 w-4" />
+                      تحديث الباركود
+                    </>
+                  )}
                 </Button>
               ) : null}
               {canDisconnect ? (

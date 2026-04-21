@@ -59,6 +59,7 @@ deploy/vps/sites/site-4/site.env
 - لا تجعل موقعين يشتركان في نفس `WHATSAPP_AUTH_DIR`
 - لا تجعل موقعين يشتركان في نفس `WHATSAPP_STATUS_FILE_PATH`
 - يجب أن يكون `WHATSAPP_CLIENT_ID` مختلفًا لكل موقع
+- لا تترك `WHATSAPP_WORKER_STATE_SETTING_ID` و `WHATSAPP_WORKER_COMMAND_SETTING_ID` كمعرّف عام مشترك إذا كانت عدة مواقع تستخدم نفس مشروع Supabase. إذا تُركت بالقيم الافتراضية فالكود سيضيف `instance slug` تلقائيًا لكل موقع.
 - كل app يجب أن يقرأ نفس env الخاص بالworker المقابل له
 
 ## 3. تشغيل المواقع والواتساب عبر PM2

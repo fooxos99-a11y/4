@@ -53,6 +53,16 @@ function getDefaultInstanceSlug() {
   return "default"
 }
 
+function resolveScopedSettingId(rawValue, baseId, instanceSlug) {
+  const normalizedValue = String(rawValue || "").trim()
+
+  if (!normalizedValue || normalizedValue === baseId) {
+    return `${baseId}_${instanceSlug}`
+  }
+
+  return normalizedValue
+}
+
 const INSTANCE_SLUG = getDefaultInstanceSlug()
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -65,8 +75,8 @@ const STATUS_FILE_PATH = process.env.WHATSAPP_STATUS_FILE_PATH || path.join(__di
 const COMMAND_FILE_PATH = process.env.WHATSAPP_COMMAND_FILE_PATH || path.join(__dirname, `command-${INSTANCE_SLUG}.json`)
 const LOCK_FILE_PATH = process.env.WHATSAPP_LOCK_FILE_PATH || path.join(__dirname, `worker-${INSTANCE_SLUG}.lock`)
 const CLIENT_ID = process.env.WHATSAPP_CLIENT_ID || `qabas-whatsapp-worker-${INSTANCE_SLUG}`
-const WORKER_STATE_SETTING_ID = process.env.WHATSAPP_WORKER_STATE_SETTING_ID || "whatsapp_worker_state"
-const WORKER_COMMAND_SETTING_ID = process.env.WHATSAPP_WORKER_COMMAND_SETTING_ID || "whatsapp_worker_command"
+const WORKER_STATE_SETTING_ID = resolveScopedSettingId(process.env.WHATSAPP_WORKER_STATE_SETTING_ID, "whatsapp_worker_state", INSTANCE_SLUG)
+const WORKER_COMMAND_SETTING_ID = resolveScopedSettingId(process.env.WHATSAPP_WORKER_COMMAND_SETTING_ID, "whatsapp_worker_command", INSTANCE_SLUG)
 const MIN_DELAY_MS = Number(process.env.WHATSAPP_MIN_DELAY_MS || 5000)
 const MAX_DELAY_MS = Number(process.env.WHATSAPP_MAX_DELAY_MS || 12000)
 const BURST_SIZE = Number(process.env.WHATSAPP_BURST_SIZE || 20)

@@ -361,10 +361,17 @@ export function WhatsAppQrDialog({ open, onOpenChange, initialStatus }: WhatsApp
                     variant="outline"
                     onClick={handleRefreshQr}
                     disabled={isLoadingStatus || isRefreshingQr}
-                    className="h-10 rounded-2xl border-[#d7e3f2] bg-white px-3 text-sm font-black text-[#3453a7] hover:bg-[#f8fbff]"
+                    className="h-10 w-[96px] rounded-2xl border-[#d7e3f2] bg-white px-3 text-sm font-black text-[#3453a7] hover:bg-[#f8fbff]"
+                    aria-label={isRefreshingQr ? "جاري تحديث الباركود" : "تحديث الباركود"}
                   >
-                    <RefreshCw className={`me-1.5 h-4 w-4 ${isLoadingStatus || isRefreshingQr ? "animate-spin" : ""}`} />
-                    {isRefreshingQr ? "جاري التحديث..." : "تحديث"}
+                    {isRefreshingQr ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <RefreshCw className="me-1.5 h-4 w-4" />
+                        تحديث
+                      </>
+                    )}
                   </Button>
                 ) : null}
                 {canDisconnect ? (
