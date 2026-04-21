@@ -743,11 +743,6 @@ export default function WhatsAppSendPage() {
                       </Button>
                     </div>
 
-                    <div className="rounded-2xl bg-[#f8fbff] px-4 py-3 text-sm text-[#1a2332]">
-                      الفئة الحالية: <span className="font-bold text-[#3453a7]">{RECIPIENT_GROUP_LABELS[selectedRecipientGroup]}</span>
-                      <span className="mr-2 text-neutral-500">({currentRecipients.length} رقم متاح)</span>
-                    </div>
-
                     <div className="max-h-[600px] overflow-y-auto space-y-2">
                       {filteredRecipients.length === 0 ? (
                         <div className="text-center py-12 text-gray-500">

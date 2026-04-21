@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { isPrivilegedRole, requireRoles } from "@/lib/auth/guards"
+import { normalizeGuardianPhoneForStorage } from "@/lib/phone-number"
 
 function getErrorMessage(error: unknown) {
   if (!error) return "حدث خطأ غير معروف"
@@ -12,6 +13,34 @@ function getErrorMessage(error: unknown) {
   }
 
   return String(error)
+}
+
+function normalizePhoneNumber(phoneNumber: unknown) {
+  if (phoneNumber === undefined) return undefined
+  if (phoneNumber === null) return null
+
+  const trimmedPhone = String(phoneNumber).trim()
+  if (!trimmedPhone) return null
+
+  return normalizeGuardianPhoneForStorage(trimmedPhone)
+}
+
+function mapTeacherWriteError(error: unknown) {
+  const message = getErrorMessage(error)
+
+  if (/account_number/i.test(message) && /duplicate|unique/i.test(message)) {
+    return "رقم الحساب موجود بالفعل"
+  }
+
+  if (/id_number/i.test(message) && /duplicate|unique/i.test(message)) {
+    return "رقم الهوية موجود بالفعل"
+  }
+
+  if (/phone_number/i.test(message) && /invalid|phone/i.test(message)) {
+    return "رقم الجوال غير صالح"
+  }
+
+  return message
 }
 
 export async function GET(request: Request) {
@@ -130,20 +159,32 @@ export async function POST(request: Request) {
       return auth.response
     }
 
-    const supabase = await createClient()
     const body = await request.json()
-    const { name, id_number, account_number, halaqah, role } = body
+    const name = String(body.name || "").trim()
+    const idNumber = String(body.id_number || "").trim()
+    const halaqah = String(body.halaqah || "").trim()
+    const role = String(body.role || "").trim()
+    const accountNumber = Number.parseInt(String(body.account_number || ""), 10)
 
-    if (!name || !id_number || !account_number || !halaqah) {
+    if (!name || !idNumber || Number.isNaN(accountNumber) || !halaqah) {
       return NextResponse.json({ error: "جميع الحقول مطلوبة" }, { status: 400 })
     }
+
+    let normalizedPhoneNumber: string | null | undefined
+    try {
+      normalizedPhoneNumber = normalizePhoneNumber(body.phone_number)
+    } catch {
+      return NextResponse.json({ error: "رقم الجوال غير صالح" }, { status: 400 })
+    }
+
+    const supabase = createAdminClient()
 
     const assignedRole = role === "deputy_teacher" ? "deputy_teacher" : "teacher"
 
     const { data: existingUser } = await supabase
       .from("users")
       .select("id")
-      .eq("account_number", account_number)
+      .eq("account_number", accountNumber)
       .maybeSingle()
 
     if (existingUser) {
@@ -155,10 +196,11 @@ export async function POST(request: Request) {
       .insert([
         {
           name,
-          id_number,
+          id_number: idNumber,
           role: assignedRole,
           halaqah,
-          account_number: Number.parseInt(account_number),
+          account_number: accountNumber,
+          phone_number: normalizedPhoneNumber,
           password_hash: "",
         },
       ])
@@ -167,7 +209,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("[v0] Error adding teacher:", error)
-      return NextResponse.json({ error: "فشل في إضافة المعلم" }, { status: 500 })
+      return NextResponse.json({ error: mapTeacherWriteError(error) }, { status: 500 })
     }
 
     return NextResponse.json(

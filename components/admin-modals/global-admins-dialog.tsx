@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import { UserPlus, Shield, PlusCircle, Trash2, Settings, Plus, Edit2 } from 'lucide-react'
 import { useAdminAuth } from "@/hooks/use-admin-auth"
+import { normalizeGuardianPhoneForStorage } from "@/lib/phone-number"
 
 interface UserEntry {
   id: string
@@ -210,6 +211,15 @@ export function GlobalAdminsDialog() {
       return
     }
 
+    if (newAdmin.phone_number.trim()) {
+      try {
+        normalizeGuardianPhoneForStorage(newAdmin.phone_number)
+      } catch {
+        toast({ title: "خطأ", description: "رقم الجوال غير صالح", variant: "destructive" })
+        return
+      }
+    }
+
     setIsSubmitting(true)
     try {
       const response = await fetch("/api/admin-users", {
@@ -230,8 +240,8 @@ export function GlobalAdminsDialog() {
       setNewAdmin({ name: "", account_number: "", phone_number: "", id_number: "", role: roles[0] || "سكرتير" })
       setIsAddMode(false)
       fetchData()
-    } catch {
-      toast({ title: "خطأ", description: "حدث خطأ أثناء الإضافة", variant: "destructive" })
+    } catch (error) {
+      toast({ title: "خطأ", description: error instanceof Error ? error.message : "حدث خطأ أثناء الإضافة", variant: "destructive" })
     } finally {
       setIsSubmitting(false)
     }
@@ -357,13 +367,13 @@ export function GlobalAdminsDialog() {
                   resetRoleForm()
                   setIsAddRoleMode(false)
                 }}>إلغاء</Button>
-                <Button onClick={handleSaveRole} disabled={isSubmitting} className="bg-[#3453a7] text-white border-none disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">
+                <Button onClick={handleSaveRole} disabled={isSubmitting} className="relative h-10 min-w-[140px] bg-[#3453a7] text-white border-none disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">
+                  <span className={isSubmitting ? "invisible" : ""}>{editingRoleName ? "حفظ التعديل" : "حفظ المسمى"}</span>
                   {isSubmitting ? (
-                    <span className="flex items-center gap-2">
+                    <span className="absolute inset-0 flex items-center justify-center">
                       <SiteLoader size="sm" color="#f8f4ea" />
-                      جاري الحفظ...
                     </span>
-                  ) : editingRoleName ? "حفظ التعديل" : "حفظ المسمى"}
+                  ) : null}
                 </Button>
               </div>
             </DialogContent>
@@ -411,13 +421,13 @@ export function GlobalAdminsDialog() {
               </div>
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setIsAddMode(false)}>إلغاء</Button>
-                <Button onClick={handleAddAdmin} disabled={isSubmitting} className="bg-[#3453a7] text-white border-none disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">
+                <Button onClick={handleAddAdmin} disabled={isSubmitting} className="relative h-10 min-w-[140px] bg-[#3453a7] text-white border-none disabled:bg-[#8ea2df] disabled:text-white disabled:opacity-100">
+                  <span className={isSubmitting ? "invisible" : ""}>حفظ</span>
                   {isSubmitting ? (
-                    <span className="flex items-center gap-2">
+                    <span className="absolute inset-0 flex items-center justify-center">
                       <SiteLoader size="sm" color="#f8f4ea" />
-                      جاري الحفظ...
                     </span>
-                  ) : "حفظ"}
+                  ) : null}
                 </Button>
               </div>
             </DialogContent>

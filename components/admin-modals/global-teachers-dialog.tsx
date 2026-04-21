@@ -285,7 +285,14 @@ export function GlobalTeachersDialog() {
       return
     }
 
-    if (!newTeacherName.trim() || !newTeacherIdNumber.trim() || !newTeacherAccountNumber.trim() || !selectedHalaqah.trim()) {
+    const resolvedTeacherName = newTeacherName.trim() || (document.getElementById("teacherName") as HTMLInputElement | null)?.value.trim() || ""
+    const resolvedTeacherIdNumber = newTeacherIdNumber.trim() || (document.getElementById("teacherIdNumber") as HTMLInputElement | null)?.value.trim() || ""
+    const resolvedTeacherAccountNumber = normalizeLocalizedDigits(newTeacherAccountNumber.trim() || (document.getElementById("teacherAccountNumber") as HTMLInputElement | null)?.value.trim() || "")
+    const resolvedTeacherPhoneNumber = newTeacherPhoneNumber.trim() || (document.getElementById("teacherPhoneNumber") as HTMLInputElement | null)?.value.trim() || ""
+    const halaqahTriggerText = document.getElementById("teacherHalaqahTrigger")?.textContent?.replace(/\s+/g, " ").trim() || ""
+    const resolvedHalaqah = selectedHalaqah.trim() || (halaqahTriggerText && halaqahTriggerText !== "اختر الحلقة" ? halaqahTriggerText : "")
+
+    if (!resolvedTeacherName || !resolvedTeacherIdNumber || !resolvedTeacherAccountNumber || !resolvedHalaqah) {
       await showAlert("الرجاء ملء جميع الحقول", "تنبيه")
       return
     }
@@ -296,11 +303,11 @@ export function GlobalTeachersDialog() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: newTeacherName,
-          id_number: newTeacherIdNumber,
-          account_number: Number.parseInt(newTeacherAccountNumber),
-          phone_number: newTeacherPhoneNumber,
-          halaqah: selectedHalaqah,
+          name: resolvedTeacherName,
+          id_number: resolvedTeacherIdNumber,
+          account_number: Number.parseInt(resolvedTeacherAccountNumber, 10),
+          phone_number: resolvedTeacherPhoneNumber,
+          halaqah: resolvedHalaqah,
           role: newTeacherRole,
         }),
       })
@@ -313,8 +320,8 @@ export function GlobalTeachersDialog() {
 
       await fetchTeachers()
       const roleLabel = newTeacherRole === "deputy_teacher" ? "نائب معلم" : "معلم"
-      const teacherName = newTeacherName
-      const halaqahName = selectedHalaqah
+      const teacherName = resolvedTeacherName
+      const halaqahName = resolvedHalaqah
       resetSingleForm()
       setAddDialogView("single")
       setIsAddDialogOpen(false)
@@ -705,7 +712,7 @@ export function GlobalTeachersDialog() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="teacherAccountNumber" className="text-sm font-semibold text-[#1a2332]">رقم الحساب</Label>
-                    <Input id="teacherAccountNumber" value={newTeacherAccountNumber} onChange={(event) => setNewTeacherAccountNumber(event.target.value)} placeholder="00000" className="h-10 rounded-xl border-[#3453a7]/40 text-sm focus-visible:border-[#3453a7] focus-visible:ring-[#3453a7]/30" dir="ltr" type="number" />
+                    <Input id="teacherAccountNumber" value={newTeacherAccountNumber} onChange={(event) => setNewTeacherAccountNumber(normalizeLocalizedDigits(event.target.value))} placeholder="00000" className="h-10 rounded-xl border-[#3453a7]/40 text-sm focus-visible:border-[#3453a7] focus-visible:ring-[#3453a7]/30" dir="ltr" type="text" inputMode="numeric" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -722,7 +729,7 @@ export function GlobalTeachersDialog() {
                   <div className="space-y-1.5">
                     <Label htmlFor="halaqah" className="text-sm font-semibold text-[#1a2332]">الحلقة</Label>
                     <Select value={selectedHalaqah} onValueChange={setSelectedHalaqah}>
-                      <SelectTrigger className="h-10 rounded-xl border-[#3453a7]/40 text-sm focus:border-[#3453a7]"><SelectValue placeholder="اختر الحلقة" /></SelectTrigger>
+                      <SelectTrigger id="teacherHalaqahTrigger" className="h-10 rounded-xl border-[#3453a7]/40 text-sm focus:border-[#3453a7]"><SelectValue placeholder="اختر الحلقة" /></SelectTrigger>
                       <SelectContent style={{ zIndex: 120 }}>
                         {circles.map((circle) => (
                           <SelectItem key={circle.id} value={circle.name}>{circle.name}</SelectItem>
