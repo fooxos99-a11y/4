@@ -1,0 +1,102 @@
+          <Dialog open={isEditStudentDialogOpen} onOpenChange={setIsEditStudentDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-xl text-[#1a2332]">تعديل بيانات الطالب</DialogTitle>
+                <DialogDescription className="text-sm text-neutral-500">اختر الحلقة والطالب لتعديل معلوماته</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editCircleSelect" className="text-sm font-medium text-neutral-600">
+                    اختر الحلقة
+                  </Label>
+                  <Select
+                    value={selectedCircleForEdit}
+                    onValueChange={(value) => {
+                      setSelectedCircleForEdit(value)
+                      setSelectedStudentForEdit("")
+                      setEditingStudent(null)
+                    }}
+                  >
+                    <SelectTrigger className="w-full text-base">
+                      <SelectValue placeholder="اختر الحلقة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {circles.map((circle) => (
+                        <SelectItem key={circle.name} value={circle.name}>
+                          {circle.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editStudentSelect" className="text-sm font-medium text-neutral-600">
+                    اختر الطالب
+                  </Label>
+                  <Select
+                    value={selectedStudentForEdit}
+                    onValueChange={handleSelectStudentForEdit}
+                    disabled={!selectedCircleForEdit}
+                  >
+                    <SelectTrigger className="w-full text-base">
+                      <SelectValue placeholder={selectedCircleForEdit ? "اختر الطالب" : "اختر الحلقة أولاً"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(studentsInCircles[(selectedCircleForEdit || "").trim()] || []).map((student: any) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editingStudent && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="editStudentIdNum" className="text-sm font-medium text-neutral-600">
+                        رقم الهوية
+                      </Label>
+                      <Input
+                        id="editStudentIdNum"
+                        value={editStudentIdNumber}
+                        onChange={(e) => setEditStudentIdNumber(e.target.value)}
+                        placeholder="أدخل رقم الهوية"
+                        className="text-sm"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="editGuardianPhone" className="text-sm font-medium text-neutral-600">
+                        رقم جوال ولي الأمر
+                      </Label>
+                      <Input
+                        id="editGuardianPhone"
+                        value={editGuardianPhone}
+                        onChange={(e) => setEditGuardianPhone(e.target.value)}
+                        placeholder="966501234567"
+                        className="text-sm"
+                        dir="ltr"
+                      />
+                      <p className="text-xs text-gray-500">مثال: 966501234567</p>
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { setIsEditStudentDialogOpen(false); setEditingStudent(null) }}
+                  className="text-sm h-9 rounded-lg border-[#D4AF37]/50 text-neutral-600"
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  onClick={handleSaveStudentEdit}
+                  className="border border-[#D4AF37]/50 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#C9A961] hover:text-[#D4AF37] text-sm h-9 rounded-lg font-medium"
+                  disabled={!editingStudent || isSubmitting}
+                >
+                  {isSubmitting ? "جاري الحفظ..." : "حفظ التعديلات"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>

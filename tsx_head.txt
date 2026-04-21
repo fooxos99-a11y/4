@@ -1,0 +1,23 @@
+﻿"use client";
+
+import { useState, useEffect } from "react";
+import { Header } from "@/components/header";
+import { Footer } from "@/components/footer";
+import { SiteLoader } from "@/components/ui/site-loader"
+import { Copy, Check, ExternalLink, Lock, Unlock, Trash2, UserPlus, X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase-client";
+import { toast } from "@/hooks/use-toast";
+import { useAdminAuth } from "@/hooks/use-admin-auth"
+
+interface EnrollmentRequest {
+  id: string;
+  full_name: string;
+  guardian_phone: string;
+  id_number: string;
+  educational_

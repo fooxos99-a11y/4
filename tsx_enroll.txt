@@ -1,0 +1,27 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase-client";
+import { toast } from "@/hooks/use-toast";
+import { Header } from "@/components/header";
+import { Footer } from "@/components/footer";
+import { SiteLoader } from "@/components/ui/site-loader"
+import {} from "lucide-react";
+
+export default function EnrollPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isEnrollmentOpen, setIsEnrollmentOpen] = useState(true);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  
+  useEffect(() => {
+    const fetchEnrollmentStatus = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('programs')
+          .select('is_active')
+          .eq('id', '00000000-0000-0000-0000-000000000000')
+          .maybeSingle();
+        
+        if (!error && data) {
+          setIsEnrollmentOpen(data.is_active)

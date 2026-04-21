@@ -1,0 +1,13 @@
+[dotenv@17.3.1] injecting env (2) from .env.local -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+{
+  error: {
+    code: 'PGRST202',
+    details: 'Searched for the function public.exec_sql with parameter sql or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.',
+    hint: null,
+    message: 'Could not find the function public.exec_sql(sql) in the schema cache'
+  },
+  data: null,
+  count: null,
+  status: 404,
+  statusText: 'Not Found'
+}

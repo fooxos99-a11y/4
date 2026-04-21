@@ -1,0 +1,1 @@
+const { createClient } = require('@supabase/supabase-js'); require('dotenv').config({path: '.env.local'}); const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY); supabase.rpc('exec_sql', { sql: 'ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS memorized_amount TEXT;' }).then(console.log); 

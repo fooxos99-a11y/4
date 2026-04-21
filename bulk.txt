@@ -1,0 +1,74 @@
+          <Dialog open={isBulkAddStudentDialogOpen} onOpenChange={(open) => { setIsBulkAddStudentDialogOpen(open); if (!open) { setBulkCircle(""); setBulkRows(emptyRows()) } }}>
+            <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-xl text-[#1a2332]">إضافة جماعية للطلاب</DialogTitle>
+                <DialogDescription className="text-sm text-neutral-500">اختر الحلقة ثم أدخل بيانات الطلاب</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                {/* اختيار الحلقة */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-neutral-600">اسم الحلقة</Label>
+                  <Select value={bulkCircle} onValueChange={setBulkCircle}>
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="اختر الحلقة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {circles.map((circle) => (
+                        <SelectItem key={circle.name} value={circle.name}>{circle.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* صف العناوين */}
+                <div className="grid grid-cols-2 gap-2 mb-1">
+                  <span className="text-xs font-bold text-neutral-500 text-right pr-1">اسم الطالب</span>
+                  <span className="text-xs font-bold text-neutral-500 text-right pr-1">رقم الحساب</span>
+                </div>
+
+                {/* صفوف الطلاب */}
+                <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+                  {bulkRows.map((row, idx) => (
+                    <div key={idx} className="grid grid-cols-2 gap-2 items-center">
+                      <Input
+                        placeholder={`اسم الطالب ${idx + 1}`}
+                        value={row.name}
+                        onChange={e => setBulkRows(prev => prev.map((r, i) => i === idx ? { ...r, name: e.target.value } : r))}
+                        className="text-sm h-9"
+                        dir="rtl"
+                      />
+                      <Input
+                        placeholder="رقم الحساب"
+                        value={row.account}
+                        onChange={e => setBulkRows(prev => prev.map((r, i) => i === idx ? { ...r, account: e.target.value } : r))}
+                        className="text-sm h-9"
+                        dir="ltr"
+                        type="number"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* زر إضافة صف */}
+                <button
+                  type="button"
+                  onClick={() => setBulkRows(prev => [...prev, { name: "", account: "" }])}
+                  className="flex items-center gap-1.5 text-sm text-[#C9A961] hover:text-[#D4AF37] font-medium transition-colors"
+                >
+                  <span className="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center text-base leading-none">+</span>
+                  إضافة سطر
+                </button>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setIsBulkAddStudentDialogOpen(false)} className="text-sm h-9 rounded-lg border-[#D4AF37]/50 text-neutral-600">إلغاء</Button>
+                <Button
+                  onClick={handleBulkAddStudents}
+                  disabled={!bulkCircle || bulkRows.every(r => !r.name.trim() || !r.account.trim()) || isBulkSubmitting}
+                  className="border border-[#D4AF37]/50 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#C9A961] hover:text-[#D4AF37] text-sm h-9 rounded-lg font-medium"
+                >
+                  {isBulkSubmitting ? "جاري الحفظ..." : "حفظ الجميع"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>

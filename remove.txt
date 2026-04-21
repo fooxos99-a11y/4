@@ -1,0 +1,70 @@
+          <Dialog open={isRemoveStudentDialogOpen} onOpenChange={setIsRemoveStudentDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-xl text-[#1a2332]">إزالة طالب</DialogTitle>
+                <DialogDescription className="text-sm text-neutral-500">اختر الحلقة ثم اختر الطالب المراد إزالته</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="removeCircleSelect" className="text-sm font-medium text-neutral-600">
+                    اختر الحلقة
+                  </Label>
+                  <Select
+                    value={selectedCircleToRemove}
+                    onValueChange={(value) => {
+                      setSelectedCircleToRemove(value)
+                      setSelectedStudentToRemove("")
+                    }}
+                  >
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="اختر الحلقة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {circles.map((circle) => (
+                        <SelectItem key={circle.name} value={circle.name}>
+                          {circle.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="removeStudentSelect" className="text-sm font-semibold text-[#1a2332]">
+                    اختر الطالب
+                  </Label>
+                  <Select
+                    value={selectedStudentToRemove}
+                    onValueChange={setSelectedStudentToRemove}
+                    disabled={!selectedCircleToRemove}
+                  >
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder={selectedCircleToRemove ? "اختر الطالب" : "اختر الحلقة أولاً"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableStudentsToRemove.map((student: any) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { setIsRemoveStudentDialogOpen(false); setSelectedCircleToRemove(""); setSelectedStudentToRemove("") }}
+                  className="text-sm h-9 rounded-lg border-[#D4AF37]/50 text-neutral-600"
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  onClick={handleRemoveStudent}
+                  className="bg-red-600 hover:bg-red-700 text-white text-sm h-9 rounded-lg font-medium"
+                  disabled={!selectedStudentToRemove || !selectedCircleToRemove || isSubmitting}
+                >
+                  {isSubmitting ? "جاري الإزالة..." : "إزالة"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>

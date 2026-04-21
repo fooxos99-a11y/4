@@ -1,0 +1,361 @@
+{isLoggedIn && isAdmin && (
+            <>
+              <SectionHeader title="لوحة التحكم" />
+
+              {/* فئة إدارة الطلاب */}
+
+              {hasPermission("إدارة الطلاب") && <div className="px-2 mb-0.5">
+                <CollapseSection
+                  icon={Users}
+                  label="إدارة الطلاب"
+                  isOpen={isAdminStudentsOpen}
+                  onToggle={() => setIsAdminStudentsOpen(!isAdminStudentsOpen)}
+                >
+                  {[
+                    {
+                      icon: UserPlus,
+
+                      label: "إضافة طالب",
+
+                      path: "/admin/dashboard?action=add-student",
+                    },
+
+                    {
+                      icon: Users,
+
+                      label: "إضافة جماعية",
+
+                      path: "?action=bulk-add",
+                    },
+
+                    {
+                      icon: UserMinus,
+
+                      label: "إزالة طالب",
+
+                      path: "/admin/dashboard?action=remove-student",
+                    },
+
+                    {
+                      icon: ArrowRightLeft,
+
+                      label: "نقل طالب",
+
+                      path: "/admin/dashboard?action=transfer-student",
+                    },
+
+                    {
+                      icon: Settings,
+
+                      label: "تعديل بيانات الطالب",
+
+                      path: "/admin/dashboard?action=edit-student",
+                    },
+
+                    {
+                      icon: Edit2,
+
+                      label: "تعديل نقاط الطالب",
+
+                      path: "/admin/dashboard?action=edit-points",
+                    },
+
+                    {
+                      icon: FileText,
+
+                      label: "سجلات الطلاب",
+
+                      path: "?action=student-records",
+                    },
+
+                    {
+                      icon: Award,
+
+                      label: "إنجازات الطلاب",
+
+                      path: "/admin/students-achievements",
+                    },
+                    {
+                      icon: BookMarked,
+
+                      label: "خطط الطلاب",
+
+                      path: "/admin/student-plans",
+                    },
+                  ].map(({ icon: Ic, label, path }) => (
+                    <NavItem
+                      key={label}
+                      icon={Ic}
+                      label={label}
+                      onClick={() => handleNav(path)}
+                      indent
+                    />
+                  ))}
+                </CollapseSection>
+              </div>}
+
+              {/* فئة إدارة المستخدمين */}
+
+              {["إدارة المعلمين", "إدارة الحلقات", "الهيكل الإداري", "طلبات الإلتحاق"].some(p => hasPermission(p)) && <div className="px-2 mb-0.5">
+                <CollapseSection
+                  icon={ShieldCheck}
+                  label="إدارة المستخدمين"
+                  isOpen={isAdminCommOpen}
+                  onToggle={() => setIsAdminCommOpen(!isAdminCommOpen)}
+                >
+                  {[
+                    {
+                      icon: Settings,
+
+                      label: "إدارة المعلمين",
+
+                      path: "?action=teachers",
+                    },
+
+                    {
+                      icon: BookOpen,
+
+                      label: "إدارة الحلقات",
+
+                      path: "?action=circles",
+                    },
+
+                    {
+                      icon: ShieldCheck,
+
+                      label: "الهيكل الإداري",
+
+                      path: "?action=admins",
+                    },
+
+                    {
+                      icon: UserPlus,
+
+                      label: "طلبات الإلتحاق",
+
+                      path: "/admin/enrollment-requests",
+                    },
+                  ].filter(({ label }) => hasPermission(label)).map(({ icon: Ic, label, path }) => (
+                    <NavItem
+                      key={label}
+                      icon={Ic}
+                      label={label}
+                      onClick={() => handleNav(path)}
+                      indent
+                    />
+                  ))}
+                </CollapseSection>
+              </div>}
+
+              {/* فئة التقارير */}
+
+              {hasPermission("التقارير") && <div className="px-2 mb-0.5">
+                <CollapseSection
+                  icon={FileText}
+                  label="التقارير"
+                  isOpen={isAdminReportsOpen}
+                  onToggle={() => setIsAdminReportsOpen(!isAdminReportsOpen)}
+                >
+                  {[
+                    {
+                      icon: FileText,
+
+                      label: "تقارير المعلمين",
+
+                      path: "/admin/teacher-attendance",
+                    },
+
+                    {
+                      icon: MessageSquare,
+
+                      label: "تقارير الرسائل",
+
+                      path: "/admin/reports",
+                    },
+
+                    {
+                      icon: FileText,
+
+                      label: "السجل اليومي للطلاب",
+
+                      path: "/admin/student-daily-attendance",
+                    },
+                  ].map(({ icon: Ic, label, path }) => (
+                    <NavItem
+                      key={label}
+                      icon={Ic}
+                      label={label}
+                      onClick={() => handleNav(path)}
+                      indent
+                    />
+                  ))}
+                </CollapseSection>
+              </div>}
+
+              {/* فئة الإدارة العامة */}
+
+              {["الإشعارات", "إدارة المسار", "إدارة المتجر", "الإرسال إلى أولياء الأمور", "الصلاحيات", "المالية", "الإحصائيات"].some(p => hasPermission(p)) && <div className="px-2 mb-0.5">
+                <CollapseSection
+                  icon={Settings}
+                  label="الإدارة العامة"
+                  isOpen={isAdminGeneralOpen}
+                  onToggle={() => setIsAdminGeneralOpen(!isAdminGeneralOpen)}
+                >
+                  {[
+                    {
+                      icon: Bell,
+
+                      label: "الإشعارات",
+
+                      permKey: "الإشعارات",
+
+                      path: "/admin/notifications",
+                    },
+
+                    {
+                      icon: Map,
+
+                      label: "إدارة المسار",
+
+                      permKey: "إدارة المسار",
+
+                      path: "/admin/pathways",
+                    },
+
+                    {
+                      icon: ShoppingBag,
+
+                      label: "إدارة المتجر",
+
+                      permKey: "إدارة المتجر",
+
+                      path: "/admin/store-management",
+                    },
+
+                    {
+                      icon: Send,
+
+                      label: "إرسال لأولياء الأمور",
+
+                      permKey: "الإرسال إلى أولياء الأمور",
+
+                      path: "/admin/whatsapp-send",
+                    },
+
+                    {
+                      icon: ShieldCheck,
+
+                      label: "الصلاحيات",
+
+                      permKey: "الصلاحيات",
+
+                      path: "/admin/permissions",
+                    },
+
+                    {
+                      icon: Banknote,
+
+                      label: "المالية",
+
+                      permKey: "المالية",
+
+                      path: "/admin/finance",
+                    },
+
+                    {
+                      icon: BarChart3,
+
+                      label: "الإحصائيات",
+
+                      permKey: "الإحصائيات",
+
+                      path: "/admin/statistics",
+                    },
+                  ].filter(({ permKey }) => hasPermission(permKey)).map(({ icon: Ic, label, path }) => (
+                    <NavItem
+                      key={label}
+                      icon={Ic}
+                      label={label}
+                      onClick={() => handleNav(path)}
+                      indent
+                    />
+                  ))}
+                </CollapseSection>
+              </div>}
+
+              {/* فئة الألعاب */}
+
+              {hasPermission("إدارة الألعاب") && <div className="px-2 mb-0.5">
+                <CollapseSection
+                  icon={Gamepad2}
+                  label="الألعاب"
+                  isOpen={isAdminGamesOpen}
+                  onToggle={() => setIsAdminGamesOpen(!isAdminGamesOpen)}
+                >
+                  {[
+                    {
+                      icon: Star,
+
+                      label: "قاعدة صور خمن الصورة",
+
+                      path: "/admin/guess-images",
+                    },
+
+                    {
+                      icon: Zap,
+
+                      label: "قاعدة أسئلة المزاد",
+
+                      path: "/admin/auction-questions",
+                    },
+
+                    {
+                      icon: BookOpen,
+
+                      label: "إدارة خلية الحروف",
+
+                      path: "/admin/letter-hive-questions",
+                    },
+
+                    {
+                      icon: FileText,
+
+                      label: "قاعدة أسئلة الفئات",
+
+                      path: "/admin/questions",
+                    },
+                  ].map(({ icon: Ic, label, path }) => (
+                    <NavItem
+                      key={label}
+                      icon={Ic}
+                      label={label}
+                      onClick={() => handleNav(path)}
+                      indent
+                    />
+                  ))}
+                </CollapseSection>
+              </div>}
+            </>
+          )}
+
+          {/* تسجيل الخروج */}
+          {isLoggedIn && (
+            <div className="px-2 mt-1 mb-4">
+              <button
+                onClick={() => { setIsMobileMenuOpen(false); handleLogout(); }}
+                className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-right text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                  <LogOut size={16} className="text-red-500" />
+                </div>
+                <span>تسجيل الخروج</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default Header;

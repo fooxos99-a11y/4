@@ -1,0 +1,17 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="tab-circle-clip">
+      <circle cx="32" cy="32" r="30" />
+    </clipPath>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="#3453a7" />
+  <image
+    href="/%D8%B4%D8%B9%D8%A7%D8%B1%20%D8%A7%D9%84%D8%AC%D9%88%D8%A7%D9%84.png"
+    x="8"
+    y="8"
+    width="48"
+    height="48"
+    preserveAspectRatio="xMidYMid meet"
+    clip-path="url(#tab-circle-clip)"
+  />
+</svg>

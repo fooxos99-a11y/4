@@ -1,0 +1,1 @@
+const fs = require('fs'); let c1 = fs.readFileSync('app/admin/reports/page.tsx', 'utf8'); c1 = c1.replace(/export const dynamic =.*\n/, ''); fs.writeFileSync('app/admin/reports/page.tsx', c1); let c2 = fs.readFileSync('app/admin/statistics/page.tsx', 'utf8'); c2 = c2.replace(/export const dynamic =.*\n/, ''); fs.writeFileSync('app/admin/statistics/page.tsx', c2);

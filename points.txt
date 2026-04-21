@@ -1,0 +1,91 @@
+          <Dialog open={isEditPointsDialogOpen} onOpenChange={setIsEditPointsDialogOpen}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="text-xl text-[#1a2332]">تعديل نقاط الطالب</DialogTitle>
+                  <DialogDescription className="text-sm text-neutral-500">اختر الحلقة والطالب لتعديل نقاطه</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="pointsCircleSelect" className="text-sm font-semibold text-[#1a2332]">
+                      اختر الحلقة
+                    </Label>
+                    <Select
+                      value={selectedCircleForPoints}
+                      onValueChange={(value) => {
+                        setSelectedCircleForPoints(value)
+                        setSelectedStudentForPoints("")
+                        setEditingStudentPoints(null)
+                        setNewPoints("")
+                      }}
+                    >
+                      <SelectTrigger className="w-full text-sm">
+                        <SelectValue placeholder="اختر الحلقة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {circles.map((circle) => (
+                          <SelectItem key={circle.name} value={circle.name}>
+                            {circle.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pointsStudentSelect" className="text-sm font-semibold text-[#1a2332]">
+                      اختر الطالب
+                    </Label>
+                    <Select
+                      value={selectedStudentForPoints}
+                      onValueChange={handleSelectStudentForPoints}
+                      disabled={!selectedCircleForPoints}
+                    >
+                      <SelectTrigger className="w-full text-sm">
+                        <SelectValue placeholder={selectedCircleForPoints ? "اختر الطالب" : "اختر الحلقة أولاً"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(studentsInCircles[(selectedCircleForPoints || "").trim()] || []).map((student: any) => (
+                          <SelectItem key={student.id} value={student.id}>
+                            {student.name} - النقاط الحالية: {student.points || 0}
+                          </SelectItem>
+
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {editingStudentPoints && (
+                    <div className="space-y-2">
+                      <Label htmlFor="newPoints" className="text-sm font-semibold text-[#1a2332]">
+                        النقاط الجديدة
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant="outline" onClick={() => setNewPoints((prev) => (Math.max(0, Number(prev) - 10)).toString())} disabled={Number(newPoints) <= 0}>-</Button>
+                        <Input
+                          id="newPoints"
+                          type="number"
+                          value={newPoints}
+                          onChange={(e) => setNewPoints(e.target.value)}
+                          placeholder="أدخل النقاط الجديدة"
+                          className="text-sm w-24 text-center"
+                          min="0"
+                        />
+                        <Button type="button" variant="outline" onClick={() => setNewPoints((prev) => (Number(prev) + 10).toString())}>+</Button>
+                      </div>
+                      <p className="text-xs text-neutral-400">النقاط الحالية: {editingStudentPoints.points || 0}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => { setIsEditPointsDialogOpen(false); setEditingStudentPoints(null); setNewPoints("") }} className="text-sm h-9 rounded-lg border-[#D4AF37]/50 text-neutral-600">
+                    إلغاء
+                  </Button>
+                  <Button
+                    onClick={handleSavePoints}
+                    variant="outline"
+                    className="text-sm h-9 rounded-lg border-[#D4AF37]/50 text-neutral-600"
+                    disabled={!editingStudentPoints || !newPoints || isSubmitting}
+                  >
+                    {isSubmitting ? "جاري الحفظ..." : "حفظ النقاط"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>

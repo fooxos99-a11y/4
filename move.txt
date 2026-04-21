@@ -1,0 +1,91 @@
+          <Dialog open={isMoveStudentDialogOpen} onOpenChange={setIsMoveStudentDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="text-xl text-[#1a2332]">نقل طالب</DialogTitle>
+                <DialogDescription className="text-sm text-neutral-500">اختر الحلقة الحالية، ثم الطالب، ثم الحلقة المراد نقله إليها</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-neutral-600">
+                    الحلقة الحالية
+                  </Label>
+                  <Select
+                    value={moveSourceCircle}
+                    onValueChange={(value) => {
+                      setMoveSourceCircle(value)
+                      setMoveStudentId("")
+                    }}
+                  >
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="اختر الحلقة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {circles.map((circle) => (
+                        <SelectItem key={circle.name} value={circle.name}>
+                          {circle.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-[#1a2332]">
+                    اختر الطالب
+                  </Label>
+                  <Select
+                    value={moveStudentId}
+                    onValueChange={setMoveStudentId}
+                    disabled={!moveSourceCircle}
+                  >
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder={moveSourceCircle ? "اختر الطالب" : "اختر الحلقة أولاً"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableStudentsToMove.map((student: any) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-[#1a2332]">
+                    الحلقة المراد النقل إليها
+                  </Label>
+                  <Select
+                    value={moveTargetCircle}
+                    onValueChange={setMoveTargetCircle}
+                    disabled={!moveStudentId}
+                  >
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder={moveStudentId ? "اختر الحلقة الجديدة" : "اختر الطالب أولاً"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {circles.map((circle) => (
+                        <SelectItem key={'t_'+circle.name} value={circle.name}>
+                          {circle.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { setIsMoveStudentDialogOpen(false); setMoveSourceCircle(""); setMoveStudentId(""); setMoveTargetCircle("") }}
+                  className="text-sm h-9 rounded-lg border-[#D4AF37]/50 text-neutral-600"
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  onClick={handleMoveStudent}
+                  className="bg-[#D4AF37] hover:bg-[#C9A961] text-white text-sm h-9 rounded-lg font-medium"
+                  disabled={!moveStudentId || !moveTargetCircle || isSubmitting}
+                >
+                  {isSubmitting ? "جاري النقل..." : "حفظ"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>

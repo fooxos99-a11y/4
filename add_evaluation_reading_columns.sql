@@ -1,0 +1,13 @@
+ALTER TABLE evaluations
+ADD COLUMN IF NOT EXISTS hafiz_from_surah TEXT,
+ADD COLUMN IF NOT EXISTS hafiz_from_verse TEXT,
+ADD COLUMN IF NOT EXISTS hafiz_to_surah TEXT,
+ADD COLUMN IF NOT EXISTS hafiz_to_verse TEXT,
+ADD COLUMN IF NOT EXISTS samaa_from_surah TEXT,
+ADD COLUMN IF NOT EXISTS samaa_from_verse TEXT,
+ADD COLUMN IF NOT EXISTS samaa_to_surah TEXT,
+ADD COLUMN IF NOT EXISTS samaa_to_verse TEXT,
+ADD COLUMN IF NOT EXISTS rabet_from_surah TEXT,
+ADD COLUMN IF NOT EXISTS rabet_from_verse TEXT,
+ADD COLUMN IF NOT EXISTS rabet_to_surah TEXT,
+ADD COLUMN IF NOT EXISTS rabet_to_verse TEXT;

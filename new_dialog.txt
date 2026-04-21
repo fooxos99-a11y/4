@@ -1,0 +1,111 @@
+﻿          <Dialog open={isStudentRecordsDialogOpen} onOpenChange={(open) => { 
+            if (!open) {
+              setIsStudentRecordsDialogOpen(false)
+              setSelectedCircleForRecords("")
+              setSelectedStudentForRecords("")
+              setStudentRecords([])
+            }
+          }}>
+            <DialogContent className="max-w-2xl bg-white rounded-2xl p-0 overflow-hidden [&>button]:top-4 [&>button]:right-4 [&>button]:left-auto" dir="rtl">
+              <DialogHeader className="px-6 py-5 border-b border-[#D4AF37]/30 bg-gradient-to-r from-[#D4AF37]/8 to-transparent text-right">
+                <DialogTitle className="text-lg font-bold text-[#1a2332] pr-8 flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-[#D4AF37]/15 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37]">
+                    <FileText className="w-4 h-4" />
+                  </span>
+                  سجلات الطلاب
+                </DialogTitle>
+                <DialogDescription className="text-sm text-neutral-500 pr-10 mt-1">
+                  اختر الحلقة ثم الطالب لعرض سجل الحضور والتقييمات
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="px-6 py-5 space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium text-neutral-600">الحلقة</Label>
+                    <Select value={selectedCircleForRecords} onValueChange={(val) => { setSelectedCircleForRecords(val); setSelectedStudentForRecords(""); setStudentRecords([]); }}>
+                      <SelectTrigger className="w-full text-sm rounded-xl border-[#D4AF37]/40 h-10">
+                        <SelectValue placeholder="اختر الحلقة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {circles.map((circle) => (
+                          <SelectItem key={circle.id || circle.name} value={circle.name}>{circle.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium text-neutral-600">الطالب</Label>
+                    <Select value={selectedStudentForRecords} onValueChange={handleSelectStudentForRecords} disabled={!selectedCircleForRecords}>
+                      <SelectTrigger className="w-full text-sm rounded-xl border-[#D4AF37]/40 h-10">
+                        <SelectValue placeholder={!selectedCircleForRecords ? "اختر الحلقة أولا" : "اختر الطالب"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedCircleForRecords && (studentsInCircles[selectedCircleForRecords] || []).map((student: any) => (
+                          <SelectItem key={student.id} value={student.id}>{student.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {selectedStudentForRecords && (
+                  <div className="border border-[#D4AF37]/20 rounded-xl overflow-hidden shadow-sm bg-white">
+                    <div className="bg-[#fcfbf9] px-4 py-3 border-b border-[#D4AF37]/10 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon className="w-4 h-4 text-[#D4AF37]" />
+                        <h3 className="font-semibold text-sm text-[#1a2332]">سجل التقييمات والحضور</h3>
+                      </div>
+                    </div>
+                    
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {isLoadingRecords ? (
+                        <div className="flex justify-center items-center py-10">
+                          <div className="w-6 h-6 rounded-full border-2 border-[#D4AF37] border-t-transparent animate-spin" />
+                        </div>
+                      ) : studentRecords.length === 0 ? (
+                        <div className="text-center py-10 text-neutral-500 text-sm">
+                          لا توجد سجلات سابقة لهذا الطالب
+                        </div>
+                      ) : (
+                        <table className="w-full text-right text-sm">
+                          <thead className="bg-[#faf9f6]/80 text-[#1a2332] sticky top-0 backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.05)] border-b border-[#D4AF37]/20">
+                            <tr>
+                              <th className="px-4 py-2.5 font-medium whitespace-nowrap">التاريخ</th>
+                              <th className="px-4 py-2.5 font-medium whitespace-nowrap text-center">الحالة</th>
+                              <th className="px-4 py-2.5 font-medium whitespace-nowrap text-center">حفظ</th>
+                              <th className="px-4 py-2.5 font-medium whitespace-nowrap text-center">تكرار</th>
+                              <th className="px-4 py-2.5 font-medium whitespace-nowrap text-center">تسميع</th>
+                              <th className="px-4 py-2.5 font-medium whitespace-nowrap text-center">ربط</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#D4AF37]/10 text-neutral-600">
+                            {studentRecords.map((record) => {
+                              const lastEval = Array.isArray(record.evaluations) && record.evaluations.length > 0 
+                                ? record.evaluations[record.evaluations.length - 1] 
+                                : null;
+                              return (
+                                <tr key={record.id} className="hover:bg-[#fcfbf9] transition-colors">
+                                  <td className="px-4 py-3 whitespace-nowrap text-xs tabular-nums text-neutral-800">{new Date(record.date).toLocaleDateString("en-GB")}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center">
+                                    <span className={inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border }>
+                                      {record.status === "present" ? "حضور" : record.status === "absent" ? "غياب" : "مستأذن"}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center text-xs">{(record.status === "absent" || record.status === "excused") ? "-" : (translateLevel(lastEval?.hafiz_level) || "-")}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center text-xs">{(record.status === "absent" || record.status === "excused") ? "-" : (translateLevel(lastEval?.tikrar_level) || "-")}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center text-xs">{(record.status === "absent" || record.status === "excused") ? "-" : (translateLevel(lastEval?.samaa_level) || "-")}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center text-xs">{(record.status === "absent" || record.status === "excused") ? "-" : (translateLevel(lastEval?.rabet_level) || "-")}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
